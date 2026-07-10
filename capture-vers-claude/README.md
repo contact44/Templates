@@ -21,26 +21,41 @@ La solution est donc un **raccourci Apple** (app Raccourcis) combinant les deux,
 - L'app **Claude** installée et connectée à votre compte/abonnement.
 - L'app **Raccourcis** (préinstallée).
 
-## Recette A — tout dans Raccourcis (à privilégier)
+## Limitation vérifiée (juillet 2026)
+
+L'action **« Demander à Claude »** de l'app Claude n'accepte **que du texte** : son seul
+paramètre est *Message*, sans champ de pièce jointe. Impossible donc de lui passer la
+capture d'écran directement. Le montage qui fonctionne passe par la **feuille de
+partage** de Claude (qui, elle, accepte les images), avec le texte préparé dans le
+presse-papiers.
+
+## Recette — capture + texte via la feuille de partage
 
 Dans Raccourcis → « + » → nouveau raccourci, nommé par ex. **« Capture vers Claude »** :
 
 1. **Prendre une capture d'écran** (action système).
-2. **Demander une saisie** — type *Texte*, question : « Que veux-tu demander à Claude ? ».
-3. **Demander à Claude** (action fournie par l'app Claude) :
-   - dans le champ de la requête, insérez la variable **Saisie fournie** (le texte de l'étape 2) ;
-   - joignez la variable **Capture d'écran** de l'étape 1. Selon la version de l'app Claude, l'action expose un champ de pièce jointe/image — vérifiez en touchant la flèche de l'action pour déplier ses paramètres.
-4. La réponse s'affiche directement, et la conversation est visible dans l'app Claude.
+2. **Demander une saisie** — type *Texte*, invite : « Que veux-tu demander à Claude ? ».
+3. **Copier dans le presse-papiers** — ⚠️ avec la variable **Saisie fournie** (le
+   *texte* de l'étape 2, pas la capture : c'est l'image qui sera transmise par le
+   partage, le texte qui sera collé).
+4. **Partager** — avec la variable **Capture d'écran** de l'étape 1.
 
-> Si votre version de l'action « Demander à Claude » n'accepte que du texte (pas d'image), utilisez la recette B.
+À l'exécution : la feuille de partage s'ouvre → touchez **Claude** → l'app s'ouvre avec
+l'image jointe → appui long dans le champ de message → **Coller** → envoyer.
+Deux appuis manuels (Claude, Coller) : c'est le minimum possible sans API.
 
-## Recette B — via la feuille de partage (fonctionne toujours)
+### Variante à tester : partager image + texte d'un coup
 
-1. **Prendre une capture d'écran**.
-2. **Demander une saisie** (texte) → **Copier dans le presse-papiers** (facultatif).
-3. **Partager** la capture → choisissez **Claude** dans la feuille de partage : l'app Claude s'ouvre avec l'image jointe, il ne reste qu'à coller/taper le texte et envoyer.
+Certaines extensions de partage acceptent plusieurs éléments à la fois. À essayer :
+étape 4, partager une **liste** contenant à la fois *Capture d'écran* et *Saisie
+fournie* (action « Liste » ou en réglant l'entrée du Partager). Si l'extension Claude
+le supporte, le texte arrive prérempli et il ne reste qu'à envoyer. Sinon, revenez à
+la recette ci-dessus.
 
-Un appui de plus que la recette A, mais garanti quelle que soit la version de l'app.
+### Pour les questions sans image
+
+L'action « Demander à Claude » reste parfaite en texte seul : *Demander une saisie* →
+*Demander à Claude* avec la variable en Message — réponse affichée sans ouvrir l'app.
 
 ## Ajouter le bouton au centre de contrôle
 
@@ -54,7 +69,7 @@ Le même raccourci peut aussi être assigné au **bouton Action** (iPhone 15 Pro
 
 ## Limites connues
 
-- **« En fond »** : l'action « Demander à Claude » s'exécute sans ouvrir l'app Claude (la réponse s'affiche dans une bulle Raccourcis). En revanche, la saisie du texte affiche forcément une petite fenêtre — iOS ne permet pas de demander une saisie de manière invisible. La recette B, elle, ouvre l'app Claude.
+- **« En fond »** : dès qu'une image est impliquée, l'app Claude s'ouvre (via la feuille de partage) — l'action « Demander à Claude », seule capable de s'exécuter sans ouvrir l'app, ne prend pas d'image. Et la saisie du texte affiche forcément une petite fenêtre : iOS ne permet pas de demander une saisie de manière invisible.
 - **La capture peut inclure le centre de contrôle ouvert.** Si c'est le cas sur votre version d'iOS, lancez plutôt le raccourci via le bouton Action ou le toucher du dos, qui ne recouvrent pas l'écran.
 - **Consommation** : chaque requête compte dans les limites d'usage de l'abonnement, comme un message envoyé dans l'app.
 
