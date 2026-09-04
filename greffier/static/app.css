@@ -46,6 +46,7 @@ p{margin:0}
 .topbar nav a:hover{background:var(--line-2);color:var(--ink)}
 .topbar nav a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .topbar .clock{margin-left:auto;color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums}
+.demo-banner{background:var(--warning-soft);color:var(--ink);font-size:.8rem;text-align:center;padding:.4rem 1rem;border-bottom:1px solid var(--line)}
 /* page */
 .page{max-width:1180px;margin:0 auto;padding:26px 28px 64px}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}

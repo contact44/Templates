@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-import random
 import sys
-from datetime import timedelta
-
 from . import db as dbm
 from .config import APP_NAME, Settings
 
@@ -53,38 +50,11 @@ def cmd_run(settings: Settings, args) -> int:
 
 
 def cmd_demo_data(settings: Settings, args) -> int:
-    """Fill the database with 14 days of plausible runs for every loaded robot, so the dashboard has something to show."""
     from .app import Platform
+    from .demo import seed
 
     platform = Platform(settings)
-    rng = random.Random(args.seed)
-    created = 0
-    for robot in platform.registry:
-        if args.reset:
-            platform.db.delete_runs(robot.key)
-        base_ms = rng.randint(800, 6000)
-        for day in range(13, -1, -1):
-            per_day = rng.randint(3, 9) if robot.schedule else rng.randint(0, 3)
-            for _ in range(per_day):
-                start = dbm.utcnow() - timedelta(days=day, hours=rng.randint(0, 11), minutes=rng.randint(0, 59))
-                if start > dbm.utcnow():
-                    continue
-                roll = rng.random()
-                status = dbm.STATUS_SUCCESS if roll < 0.86 else dbm.STATUS_WARNING if roll < 0.95 else dbm.STATUS_ERROR
-                items = rng.randint(4, 40)
-                errors = 0 if status == dbm.STATUS_SUCCESS else rng.randint(1, 4)
-                duration = int(base_ms * rng.uniform(0.6, 1.7))
-                run_id = platform.db.create_run(robot.key, "demo", started_at=start)
-                platform.db.add_log(run_id, "info", f"Démarrage · {robot.name} · données de démonstration", ts=start)
-                if status == dbm.STATUS_ERROR:
-                    platform.db.add_log(run_id, "error", "TimeoutError: source indisponible (simulé)", ts=start + timedelta(milliseconds=duration))
-                    message = "TimeoutError: source indisponible (simulé)"
-                else:
-                    message = f"{items} élément(s) traité(s)" + (f", {errors} en échec" if errors else "")
-                    platform.db.add_log(run_id, "info", f"Terminé · {message}", ts=start + timedelta(milliseconds=duration))
-                platform.db.finish_run(run_id, status, items=items, errors=errors, message=message,
-                                       finished_at=start + timedelta(milliseconds=duration))
-                created += 1
+    created = seed(platform.db, platform.registry, seed=args.seed, reset=args.reset)
     platform.db.close()
     print(f"{created} exécution(s) de démonstration créée(s) dans {settings.db_path}")
     return 0

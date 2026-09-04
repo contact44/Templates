@@ -74,12 +74,17 @@ class Platform:
         self.registry = Registry(settings.robots_dir).reload()
         self.runner = Runner(self.db, self.registry, settings.workspace)
         self.scheduler = Scheduler(self.db, self.registry, self.runner, settings.timezone)
+        if settings.demo and self.db.count_runs() == 0:
+            from .demo import seed
+
+            seed(self.db, self.registry)
 
     def start(self) -> None:
         stale = self.db.mark_stale_runs()
         if stale:
             logging.getLogger("greffier").warning("%d exécution(s) interrompue(s) marquée(s) en échec", stale)
-        self.scheduler.start()
+        if not self.settings.demo:
+            self.scheduler.start()
 
     def stop(self) -> None:
         self.scheduler.shutdown()
@@ -108,6 +113,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     templates.env.filters["status_label"] = lambda s: STATUS_LABELS.get(s, s or "—")
     templates.env.filters["trigger_label"] = lambda s: TRIGGER_LABELS.get(s, s)
     templates.env.globals["app_name"] = APP_NAME
+    templates.env.globals["demo_mode"] = settings.demo
     templates.env.globals["now_label"] = lambda: fmt_long_date(datetime.now(stats.ZoneInfo(tz)))
 
     def render(request: Request, name: str, **ctx):
@@ -187,6 +193,9 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
         robot = robot_or_404(key)
         if platform.runner.is_running(key):
             return redirect(f"/robots/{key}", err="Ce robot est déjà en cours d'exécution.")
+        if settings.demo:  # no background scheduler in preview mode: run inline and show the result
+            run_id = platform.runner.execute(key, trigger="manual")
+            return redirect(f"/runs/{run_id}" if run_id else f"/robots/{key}", ok=f"{robot.name} exécuté.")
         platform.scheduler.trigger_now(key)
         return redirect(f"/robots/{key}", ok=f"{robot.name} lancé.")
 

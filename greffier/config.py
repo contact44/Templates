@@ -17,6 +17,7 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8765
     timezone: str = "Europe/Paris"
+    demo: bool = False  # preview mode: seeded demo data, no scheduler, runs execute inline
 
     @property
     def db_path(self) -> Path:
@@ -35,4 +36,5 @@ class Settings:
             host=env.get("GREFFIER_HOST", "127.0.0.1"),
             port=int(env.get("GREFFIER_PORT", "8765")),
             timezone=env.get("GREFFIER_TZ", "Europe/Paris"),
+            demo=env.get("GREFFIER_DEMO", "").lower() in ("1", "true", "on"),
         )

@@ -104,3 +104,13 @@ def test_http_pages_and_config_flow(settings):
         assert page.status_code == 200 and "Journal" in page.text
         assert client.get("/runs/999").status_code == 404
         assert "Robot OK" in client.get("/runs?robot=ok_bot").text
+
+
+def test_demo_mode_seeds_and_runs_inline(settings):
+    settings.demo = True
+    app = create_app(settings, start_scheduler=True)
+    with TestClient(app) as client:
+        assert app.state.platform.db.count_runs() > 0
+        assert "Aperçu en ligne" in client.get("/").text
+        r = client.post("/robots/ok_bot/run", follow_redirects=False)
+        assert r.headers["location"].startswith("/runs/")
