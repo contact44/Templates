@@ -1,0 +1,3 @@
+{% macro pill(status) -%}
+<span class="pill {{ status or 'none' }}"><i class="dot"></i>{{ status | status_label }}</span>
+{%- endmacro %}

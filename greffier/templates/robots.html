@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill %}
+{% block title %}Robots · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Robots</h1>
+    <p class="sub">Un robot est un fichier Python dans <span class="mono">{{ robots_dir }}</span>. Rechargez après avoir ajouté ou modifié un fichier.</p>
+  </div>
+  <form method="post" action="/robots/reload"><button class="btn" type="submit">Recharger les robots</button></form>
+</div>
+{% if load_errors %}
+<div class="flash err">
+  <b>Fichiers en erreur :</b>
+  {% for file, msg in load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}
+</div>
+{% endif %}
+<section class="panel">
+<div class="tw"><table class="t">
+  <thead><tr><th>Robot</th><th>Planification</th><th>Prochain passage</th><th>Dernier passage</th><th>État</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{{ '' if r.enabled else 'off' }}">
+    <td><a href="/robots/{{ r.spec.key }}"><b>{{ r.spec.name }}</b></a><div class="muted small">{{ r.spec.description }}</div></td>
+    <td>{% if not r.enabled %}<span class="pill none"><i class="dot"></i>Désactivé</span>{% elif r.schedule %}<span class="mono">{{ r.schedule }}</span>{% else %}À la demande{% endif %}</td>
+    <td>{{ r.next_run | dt if r.next_run else '—' }}</td>
+    <td>{{ r.last.started_at | dt if r.last else '—' }}</td>
+    <td>{% if r.running %}<span class="pill running"><i class="dot"></i>En cours</span>{% else %}{{ pill(r.last.status if r.last else none) }}{% endif %}</td>
+    <td class="actions"><form method="post" action="/robots/{{ r.spec.key }}/run"><button class="btn small" type="submit" {% if r.running %}disabled{% endif %}>Lancer</button></form></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="empty">Aucun robot chargé.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+</section>
+{% endblock %}
