@@ -35,6 +35,14 @@ def fmt_dt(value, tz: str) -> str:
     return f"{local:%d/%m %H:%M}"
 
 
+def fmt_short(value, tz: str) -> str:
+    """HH:MM today, otherwise dd/mm HH:MM. Fits on a pixel nameplate."""
+    local = stats.to_local(value, tz)
+    if local is None:
+        return ""
+    return f"{local:%H:%M}" if local.date() == datetime.now(local.tzinfo).date() else f"{local:%d/%m %H:%M}"
+
+
 def fmt_ms(value) -> str:
     if value is None:
         return "—"
@@ -227,7 +235,42 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
         robot = platform.registry.get(run["robot_key"])
         return render(request, "run.html", run=run, robot=robot, logs=platform.db.logs(run_id))
 
+    @app.get("/atelier", response_class=HTMLResponse)
+    def atelier(request: Request):
+        return render(request, "atelier.html", robots=list(platform.registry))
+
     # -- json ----------------------------------------------------------------------
+
+    @app.get("/api/live")
+    def api_live():
+        """State of every robot right now, for the workshop view. Polled every couple of seconds."""
+        now = datetime.now(stats.ZoneInfo(tz))
+        robots = []
+        for robot in platform.registry:
+            last = platform.db.last_run(robot.key)
+            live = platform.runner.progress.get(robot.key)
+            enabled = platform.scheduler.is_enabled(robot.key)
+            if live:
+                state = "running"
+            elif not enabled:
+                state = "off"
+            else:
+                state = "idle"
+            next_run = platform.scheduler.next_run(robot.key)
+            robots.append({
+                "key": robot.key, "name": robot.name, "enabled": enabled, "state": state,
+                "items": live["items"] if live else 0, "errors": live["errors"] if live else 0,
+                "run_id": live["run_id"] if live else None,
+                "last": {"id": last["id"], "status": last["status"], "finished_at": last["finished_at"],
+                         "items": last["items"], "errors": last["errors"], "message": last["message"]} if last else None,
+                "next_run": fmt_short(next_run, tz) if next_run else None,
+            })
+        names = {r.key: r.name for r in platform.registry}
+        events = [{"id": r["id"], "robot_key": r["robot_key"], "robot_name": names.get(r["robot_key"], r["robot_key"]),
+                   "status": r["status"], "started": fmt_dt(r["started_at"], tz), "items": r["items"], "message": r["message"]}
+                  for r in platform.db.runs(limit=8)]
+        return JSONResponse({"now": now.isoformat(), "clock": now.strftime("%H:%M"), "robots": robots, "events": events,
+                             "demo": settings.demo})
 
     @app.get("/api/dashboard")
     def api_dashboard():

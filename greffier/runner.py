@@ -19,8 +19,10 @@ log = logging.getLogger("greffier.runner")
 class RunContext:
     """What a robot receives. Everything it reports goes to the journal and the dashboard."""
 
-    def __init__(self, run_id: int, robot: RobotSpec, params: dict, database: Database, workspace: Path):
+    def __init__(self, run_id: int, robot: RobotSpec, params: dict, database: Database, workspace: Path,
+                 on_progress=None):
         self.run_id = run_id
+        self._on_progress = on_progress
         self.robot = robot
         self.params = params
         self.workspace = workspace
@@ -48,11 +50,17 @@ class RunContext:
     def item_done(self, n: int = 1) -> None:
         """One unit of work completed (an e-mail handled, a document produced...)."""
         self.items += n
+        self._notify()
 
     def item_failed(self, message: str) -> None:
         """One unit of work that could not be completed. The run ends in 'warning' instead of 'success'."""
         self.errors += 1
         self.warn(message)
+        self._notify()
+
+    def _notify(self) -> None:
+        if self._on_progress:
+            self._on_progress(self)
 
     def metric(self, name: str, value: Any) -> None:
         self.metrics[name] = value
@@ -70,6 +78,7 @@ class Runner:
         self.workspace = Path(workspace)
         self._locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        self.progress: dict[str, dict] = {}  # key -> live counters of the run in flight
 
     def _lock_for(self, key: str) -> threading.Lock:
         with self._locks_guard:
@@ -91,7 +100,8 @@ class Runner:
             config = self.db.get_config(key)
             params = {**robot.defaults(), **(config["params"] if config else {})}
             run_id = self.db.create_run(key, trigger)
-            ctx = RunContext(run_id, robot, params, self.db, self.workspace)
+            ctx = RunContext(run_id, robot, params, self.db, self.workspace, on_progress=self._record_progress)
+            self._record_progress(ctx)
             ctx.log(f"Démarrage · {robot.name} · déclenchement {trigger}")
             clock = time.perf_counter()
             try:
@@ -110,4 +120,8 @@ class Runner:
                                duration_ms=int((time.perf_counter() - clock) * 1000))
             return run_id
         finally:
+            self.progress.pop(key, None)
             lock.release()
+
+    def _record_progress(self, ctx: RunContext) -> None:
+        self.progress[ctx.robot.key] = {"run_id": ctx.run_id, "items": ctx.items, "errors": ctx.errors}

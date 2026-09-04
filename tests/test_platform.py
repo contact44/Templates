@@ -114,3 +114,30 @@ def test_demo_mode_seeds_and_runs_inline(settings):
         assert "Aperçu en ligne" in client.get("/").text
         r = client.post("/robots/ok_bot/run", follow_redirects=False)
         assert r.headers["location"].startswith("/runs/")
+
+
+def test_workshop_page_and_live_api(settings):
+    app = create_app(settings, start_scheduler=False)
+    with TestClient(app) as client:
+        assert "atelier.js" in client.get("/atelier").text
+        app.state.platform.runner.execute("ok_bot")
+        live = client.get("/api/live").json()
+        bot = next(r for r in live["robots"] if r["key"] == "ok_bot")
+        assert bot["state"] == "idle" and bot["last"]["status"] == "success" and bot["last"]["items"] == 3
+        assert live["events"][0]["robot_key"] == "ok_bot" and live["clock"]
+
+
+def test_runner_progress_is_live_during_a_run(settings):
+    platform = Platform(settings)
+    seen = []
+    original = platform.runner._record_progress
+
+    def spy(ctx):
+        original(ctx)
+        seen.append(dict(platform.runner.progress["ok_bot"]))
+
+    platform.runner._record_progress = spy
+    platform.runner.execute("ok_bot")
+    assert [s["items"] for s in seen] == [0, 1, 2, 3]
+    assert "ok_bot" not in platform.runner.progress
+    platform.db.close()
