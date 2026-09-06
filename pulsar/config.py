@@ -6,9 +6,10 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-APP_NAME = "Astrée"
-DEPARTMENT = "Direction juridique"
-DEFAULT_TEAM = ["Vega", "Altaïr", "Deneb"]
+APP_NAME = "Samsung Pulsar"
+SHORT_NAME = "Pulsar"
+DEPARTMENT = "Legal Department"
+DEFAULT_TEAM = ["Andromede", "Orion", "Sirius"]
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -23,7 +24,7 @@ class Settings:
 
     @property
     def db_path(self) -> Path:
-        return self.workspace / "astree.db"
+        return self.workspace / "pulsar.db"
 
     @property
     def deposited_dir(self) -> Path:
@@ -36,16 +37,16 @@ class Settings:
 
     @property
     def output_dir(self) -> Path:
-        return self.workspace / "sorties"
+        return self.workspace / "outputs"
 
     @classmethod
     def from_env(cls) -> "Settings":
         env = os.environ
         return cls(
-            workspace=Path(env.get("ASTREE_WORKSPACE", ROOT / "workspace")).resolve(),
-            scenarios_dir=Path(env.get("ASTREE_SCENARIOS", ROOT / "scenarios")).resolve(),
-            host=env.get("ASTREE_HOST", "127.0.0.1"),
-            port=int(env.get("ASTREE_PORT", "8765")),
-            timezone=env.get("ASTREE_TZ", "Europe/Paris"),
-            demo=env.get("ASTREE_DEMO", "").lower() in ("1", "true", "on"),
+            workspace=Path(env.get("PULSAR_WORKSPACE", ROOT / "workspace")).resolve(),
+            scenarios_dir=Path(env.get("PULSAR_SCENARIOS", ROOT / "scenarios")).resolve(),
+            host=env.get("PULSAR_HOST", "127.0.0.1"),
+            port=int(env.get("PULSAR_PORT", "8765")),
+            timezone=env.get("PULSAR_TZ", "Europe/Paris"),
+            demo=env.get("PULSAR_DEMO", "").lower() in ("1", "true", "on"),
         )

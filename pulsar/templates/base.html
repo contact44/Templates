@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,14 +12,14 @@
   <a class="brand" href="/">{{ app_name }}<span class="dept">{{ department }}</span></a>
   <nav>
     <a href="/" class="{{ 'on' if path == '/' else '' }}">Dashboard</a>
-    <a href="/scenarios" class="{{ 'on' if path.startswith('/scenarios') else '' }}">Scénarios</a>
+    <a href="/scenarios" class="{{ 'on' if path.startswith('/scenarios') else '' }}">Scenarios</a>
     <a href="/openspace" class="{{ 'on' if path.startswith('/openspace') else '' }}">Open space</a>
-    <a href="/parametres" class="{{ 'on' if path.startswith('/parametres') else '' }}">Paramètres</a>
-    <a href="/runs" class="{{ 'on' if path.startswith('/runs') else '' }}">Historique</a>
+    <a href="/settings" class="{{ 'on' if path.startswith('/settings') else '' }}">Settings</a>
+    <a href="/runs" class="{{ 'on' if path.startswith('/runs') else '' }}">History</a>
   </nav>
   <span class="clock">{{ now_label() }}</span>
 </header>
-{% if demo_mode %}<div class="demo-banner">Aperçu en ligne · données de démonstration fictives · pas de planification (les scénarios s'exécutent au clic) · l'historique repart de zéro à chaque réveil du serveur</div>{% endif %}
+{% if demo_mode %}<div class="demo-banner">Online preview · fictitious demonstration data · no scheduling (scenarios run on click) · history resets whenever the server wakes up</div>{% endif %}
 <main class="page">
   {% if flash_ok %}<div class="flash ok" role="status">{{ flash_ok }}</div>{% endif %}
   {% if flash_err %}<div class="flash err" role="alert">{{ flash_err }}</div>{% endif %}

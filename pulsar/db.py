@@ -247,7 +247,7 @@ class Database:
     def queued_runs(self) -> list[dict]:
         return [self._row_to_run(r) for r in self._q("SELECT * FROM runs WHERE status='queued' ORDER BY id")]
 
-    def mark_stale_runs(self, message: str = "Interrompu : la plate-forme a redémarré pendant l'exécution.") -> int:
+    def mark_stale_runs(self, message: str = "Interrupted: the platform restarted while this run was in progress.") -> int:
         rows = self._q("SELECT id FROM runs WHERE status IN ('queued','running')")
         for r in rows:
             self.finish_run(r["id"], STATUS_ERROR, message=message)

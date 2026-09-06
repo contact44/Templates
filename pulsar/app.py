@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import shutil
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import stats
-from .config import APP_NAME, DEPARTMENT, Settings
+from .config import APP_NAME, DEPARTMENT, SHORT_NAME, Settings
 from .db import Database
 from .registry import ACTION_KINDS, Inspection, Registry, inspect_source
 from .runner import Runner
@@ -25,11 +24,9 @@ from .team import Team
 from .vault import Vault
 
 HERE = Path(__file__).resolve().parent
-STATUS_LABELS = {"queued": "En file", "running": "En cours", "success": "Réussi", "warning": "Avec réserves", "error": "Échec"}
-TRIGGER_LABELS = {"manual": "manuel", "schedule": "planifié", "cli": "ligne de commande", "demo": "démo"}
-SOURCE_LABELS = {"builtin": "livré avec le code", "deposited": "déposé"}
-FR_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-FR_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+STATUS_LABELS = {"queued": "Queued", "running": "Running", "success": "Success", "warning": "With warnings", "error": "Failed"}
+TRIGGER_LABELS = {"manual": "manual", "schedule": "scheduled", "cli": "command line", "demo": "demo"}
+SOURCE_LABELS = {"builtin": "shipped with the code", "deposited": "deposited"}
 
 
 def fmt_dt(value, tz: str) -> str:
@@ -37,8 +34,8 @@ def fmt_dt(value, tz: str) -> str:
     if local is None:
         return "—"
     if local.date() == datetime.now(local.tzinfo).date():
-        return f"aujourd'hui {local:%H:%M}"
-    return f"{local:%d/%m %H:%M}"
+        return f"today {local:%H:%M}"
+    return f"{local:%d %b %H:%M}"
 
 
 def fmt_short(value, tz: str) -> str:
@@ -49,7 +46,7 @@ def fmt_short(value, tz: str) -> str:
 
 
 def fmt_long_date(dt: datetime) -> str:
-    return f"{FR_DAYS[dt.weekday()].capitalize()} {dt.day} {FR_MONTHS[dt.month - 1]} {dt.year} · {dt:%H:%M}"
+    return f"{dt:%A} {dt.day} {dt:%B %Y} · {dt:%H:%M}"
 
 
 def fmt_ms(value) -> str:
@@ -69,7 +66,7 @@ def fmt_ms(value) -> str:
 
 
 def fmt_int(value) -> str:
-    return "—" if value is None else f"{int(value):,}".replace(",", " ")
+    return "—" if value is None else f"{int(value):,}"
 
 
 class Platform:
@@ -92,7 +89,7 @@ class Platform:
     def start(self) -> None:
         stale = self.db.mark_stale_runs()
         if stale:
-            logging.getLogger("astree").warning("%d exécution(s) interrompue(s) marquée(s) en échec", stale)
+            logging.getLogger("pulsar").warning("%d interrupted run(s) marked as failed", stale)
         self.team.start()
         if not self.settings.demo:
             self.scheduler.start()
@@ -129,7 +126,7 @@ class Platform:
         if v is None or not Path(v["path"]).exists():
             return None
         code = Path(v["path"]).read_text(encoding="utf-8")
-        _, new_version = self.deposit(code, note=f"Retour à la version {version}", replacing=key)
+        _, new_version = self.deposit(code, note=f"Restored version {version}", replacing=key)
         return new_version
 
     def remove_deposited(self, key: str) -> bool:
@@ -169,6 +166,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     env.filters["trigger_label"] = lambda s: TRIGGER_LABELS.get(s, s)
     env.filters["source_label"] = lambda s: SOURCE_LABELS.get(s, s)
     env.globals["app_name"] = APP_NAME
+    env.globals["short_name"] = SHORT_NAME
     env.globals["department"] = DEPARTMENT
     env.globals["demo_mode"] = settings.demo
     env.globals["now_label"] = lambda: fmt_long_date(datetime.now(stats.ZoneInfo(tz)))
@@ -188,7 +186,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     def scenario_or_404(key: str):
         scenario = platform.registry.get(key)
         if scenario is None:
-            raise HTTPException(404, "Scénario inconnu")
+            raise HTTPException(404, "Unknown scenario")
         return scenario
 
     def names() -> dict:
@@ -212,15 +210,14 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
         return render(request, "scenarios.html", rows=rows, load_errors=platform.registry.errors,
                       builtin_dir=platform.settings.scenarios_dir, deposited_dir=platform.settings.deposited_dir)
 
-    @app.get("/scenarios/nouveau", response_class=HTMLResponse)
+    @app.get("/scenarios/new", response_class=HTMLResponse)
     def scenario_new(request: Request, replacing: str | None = None):
         code = ""
         if replacing:
-            s = scenario_or_404(replacing)
-            code = s.path.read_text(encoding="utf-8")
+            code = scenario_or_404(replacing).path.read_text(encoding="utf-8")
         return render(request, "scenario_new.html", code=code, note="", inspection=None, replacing=replacing or "")
 
-    @app.post("/scenarios/deposer", response_class=HTMLResponse)
+    @app.post("/scenarios/deposit", response_class=HTMLResponse)
     async def scenario_deposit(request: Request):
         form = await request.form()
         code = (form.get("code") or "")
@@ -233,13 +230,13 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
         action = form.get("action") or "check"
         if not code.strip():
             return render(request, "scenario_new.html", code="", note=note or "", inspection=None, replacing=replacing or "",
-                          flash_err="Aucun code : collez le scénario ou déposez un fichier .py.")
+                          flash_err="No code: paste the scenario or drop a .py file.")
         if action == "save":
             inspection, version = platform.deposit(code, note, replacing)
             if version:
-                return redirect(f"/scenarios/{inspection.key}", ok=f"Version {version} enregistrée et chargée.")
+                return redirect(f"/scenarios/{inspection.key}", ok=f"Version {version} saved and loaded.")
             return render(request, "scenario_new.html", code=code, note=note or "", inspection=inspection, replacing=replacing or "",
-                          flash_err="Le scénario n'a pas été enregistré : corrigez les points en erreur.")
+                          flash_err="The scenario was not saved: fix the items marked as errors.")
         inspection = platform.inspect(code, replacing)
         return render(request, "scenario_new.html", code=code, note=note or "", inspection=inspection, replacing=replacing or "")
 
@@ -271,41 +268,41 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
             return redirect(f"/scenarios/{key}", err=str(e))
         platform.db.save_config(key, enabled, schedule, params)
         platform.scheduler.sync()
-        return redirect(f"/scenarios/{key}", ok="Configuration enregistrée.")
+        return redirect(f"/scenarios/{key}", ok="Configuration saved.")
 
     @app.post("/scenarios/{key}/run")
     def scenario_run(key: str, request: Request):
         s = scenario_or_404(key)
         run_id = platform.team.enqueue(key, "manual")
-        back = request.headers.get("referer") or f"/scenarios/{key}"
-        target = back if back.endswith("/openspace") else f"/scenarios/{key}"
+        back = request.headers.get("referer") or ""
+        target = "/openspace" if back.endswith("/openspace") else f"/scenarios/{key}"
         if run_id is None:
-            return redirect(target, err=f"{s.name} est déjà en file ou en cours.")
+            return redirect(target, err=f"{s.name} is already queued or running.")
         if settings.demo:
-            return redirect(f"/runs/{run_id}", ok=f"{s.name} exécuté.")
-        return redirect(target, ok=f"{s.name} confié à l'équipe.")
+            return redirect(f"/runs/{run_id}", ok=f"{s.name} executed.")
+        return redirect(target, ok=f"{s.name} handed to the team.")
 
-    @app.post("/scenarios/{key}/versions/{version}/restaurer")
+    @app.post("/scenarios/{key}/versions/{version}/restore")
     def scenario_restore(key: str, version: int):
         scenario_or_404(key)
         new_version = platform.restore(key, version)
         if new_version is None:
-            return redirect(f"/scenarios/{key}", err="Version introuvable.")
-        return redirect(f"/scenarios/{key}", ok=f"Version {version} restaurée comme version {new_version}.")
+            return redirect(f"/scenarios/{key}", err="Version not found.")
+        return redirect(f"/scenarios/{key}", ok=f"Version {version} restored as version {new_version}.")
 
-    @app.post("/scenarios/{key}/retirer")
+    @app.post("/scenarios/{key}/remove")
     def scenario_remove(key: str):
         if not platform.remove_deposited(key):
-            return redirect(f"/scenarios/{key}", err="Seul un scénario déposé peut être retiré ; ses versions sont conservées.")
-        return redirect("/scenarios", ok=f"Scénario « {key} » retiré. Ses versions restent disponibles pour un nouveau dépôt.")
+            return redirect(f"/scenarios/{key}", err="Only a deposited scenario can be removed; its versions are kept.")
+        return redirect("/scenarios", ok=f"Scenario '{key}' removed. Its versions remain available for a new deposit.")
 
-    @app.post("/scenarios/recharger")
+    @app.post("/scenarios/reload")
     def scenarios_reload():
         platform.registry.reload()
         platform.scheduler.sync()
-        msg = f"{len(platform.registry)} scénario(s) chargé(s)."
+        msg = f"{len(platform.registry)} scenario(s) loaded."
         if platform.registry.errors:
-            msg += f" {len(platform.registry.errors)} fichier(s) en erreur."
+            msg += f" {len(platform.registry.errors)} file(s) with errors."
         return redirect("/scenarios", ok=msg)
 
     # -- open space ------------------------------------------------------------------------------
@@ -314,54 +311,50 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     def openspace(request: Request):
         return render(request, "openspace.html", scenarios=list(platform.registry), team=platform.team.names)
 
-    @app.get("/atelier", include_in_schema=False)
-    def atelier_redirect():
-        return RedirectResponse("/openspace")
-
     # -- settings ---------------------------------------------------------------------------------
 
-    @app.get("/parametres", response_class=HTMLResponse)
-    def parametres(request: Request):
-        return render(request, "parametres.html", team=platform.team.names, credentials=platform.db.credentials(),
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request):
+        return render(request, "settings.html", team=platform.team.names, credentials=platform.db.credentials(),
                       vault_backend=platform.vault.backend, vault_label=platform.vault.backend_label, settings=platform.settings)
 
-    @app.post("/parametres/equipe")
-    async def parametres_team(request: Request):
+    @app.post("/settings/team")
+    async def settings_team(request: Request):
         form = await request.form()
-        names = [v for k, v in form.multi_items() if k == "names"]
+        names_ = [v for k, v in form.multi_items() if k == "names"]
         try:
-            platform.team.rename(names)
+            platform.team.rename(names_)
         except ValueError as e:
-            return redirect("/parametres", err=str(e))
-        msg = "Noms enregistrés."
+            return redirect("/settings", err=str(e))
+        msg = "Robot names saved."
         if len(platform.team.names) != len(platform.team._busy) and not settings.demo:
-            msg += " Le nombre de robots change au prochain démarrage de la plate-forme."
-        return redirect("/parametres", ok=msg)
+            msg += " The number of robots changes the next time the platform starts."
+        return redirect("/settings", ok=msg)
 
-    @app.post("/parametres/identifiants")
-    async def parametres_credential(request: Request):
+    @app.post("/settings/credentials")
+    async def settings_credential(request: Request):
         form = await request.form()
         name = (form.get("name") or "").strip().lower().replace(" ", "_")
         username = (form.get("username") or "").strip()
         password = form.get("password") or ""
         note = (form.get("note") or "").strip() or None
         if not name or not all(c.isalnum() or c in "_-." for c in name):
-            return redirect("/parametres", err="Le nom de l'identifiant ne doit contenir que lettres, chiffres, _ - et point.")
+            return redirect("/settings", err="The credential name may only contain letters, digits, _ - and dots.")
         if not username:
-            return redirect("/parametres", err="L'identifiant (nom d'utilisateur) est obligatoire.")
+            return redirect("/settings", err="The username is required.")
         existing = platform.db.credential(name)
         if not password and not existing:
-            return redirect("/parametres", err="Le mot de passe est obligatoire pour un nouvel identifiant.")
+            return redirect("/settings", err="A password is required for a new credential.")
         platform.db.save_credential(name, username, note)
         if password:
             platform.vault.set_password(name, password)
-        return redirect("/parametres", ok=f"Identifiant « {name} » enregistré" + ("" if password else " (mot de passe inchangé)") + ".")
+        return redirect("/settings", ok=f"Credential '{name}' saved" + ("" if password else " (password unchanged)") + ".")
 
-    @app.post("/parametres/identifiants/{name}/supprimer")
-    def parametres_credential_delete(name: str):
+    @app.post("/settings/credentials/{name}/delete")
+    def settings_credential_delete(name: str):
         platform.db.delete_credential(name)
         platform.vault.delete_password(name)
-        return redirect("/parametres", ok=f"Identifiant « {name} » supprimé.")
+        return redirect("/settings", ok=f"Credential '{name}' deleted.")
 
     # -- runs ---------------------------------------------------------------------------------------
 
@@ -378,7 +371,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     def run_detail(request: Request, run_id: int):
         run = platform.db.run(run_id)
         if run is None:
-            raise HTTPException(404, "Exécution inconnue")
+            raise HTTPException(404, "Unknown run")
         return render(request, "run.html", run=run, scenario=platform.registry.get(run["scenario_key"]), logs=platform.db.logs(run_id),
                       steps=platform.db.steps(run_id), team=platform.team.names)
 
@@ -388,7 +381,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     def api_live():
         now = datetime.now(stats.ZoneInfo(tz))
         by_run = {w["run_id"]: w for w in platform.team.status() if w["run_id"]}
-        scenarios = []
+        scenarios_ = []
         for s in platform.registry:
             last = platform.db.last_run(s.key, finished_only=True)
             active = platform.db.active_run(s.key)
@@ -397,7 +390,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
             enabled = platform.scheduler.is_enabled(s.key)
             state = "running" if (active and active["status"] == "running") else "queued" if active else "off" if not enabled else "idle"
             next_run = platform.scheduler.next_run(s.key)
-            scenarios.append({
+            scenarios_.append({
                 "key": s.key, "name": s.name, "enabled": enabled, "state": state,
                 "items": live["items"] if live else 0, "errors": live["errors"] if live else 0,
                 "step": live["step"] if live else None, "run_id": active["id"] if active else None,
@@ -412,7 +405,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
                    "status": r["status"], "started": fmt_dt(r["started_at"], tz), "items": r["items"], "message": r["message"],
                    "worker": platform.team.names[r["worker"]] if r["worker"] is not None and r["worker"] < len(platform.team.names) else None}
                   for r in platform.db.runs(limit=8)]
-        return JSONResponse({"now": now.isoformat(), "clock": now.strftime("%H:%M"), "scenarios": scenarios, "team": team,
+        return JSONResponse({"now": now.isoformat(), "clock": now.strftime("%H:%M"), "scenarios": scenarios_, "team": team,
                              "queued": [{"id": r["id"], "scenario_name": nm.get(r["scenario_key"], r["scenario_key"])} for r in platform.team.queued()],
                              "events": events, "demo": settings.demo})
 

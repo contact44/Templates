@@ -12,14 +12,14 @@ from .db import Database
 from .registry import Registry
 from .team import Team
 
-log = logging.getLogger("astree.scheduler")
+log = logging.getLogger("pulsar.scheduler")
 
 
 def validate_cron(expr: str, timezone: str) -> str | None:
     try:
         CronTrigger.from_crontab(expr, timezone=timezone)
     except (ValueError, TypeError) as e:
-        return f"Expression cron invalide : {e}"
+        return f"Invalid cron expression: {e}"
     return None
 
 

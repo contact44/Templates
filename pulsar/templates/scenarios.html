@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill %}
+{% block title %}Scenarios · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Scenarios</h1><p class="sub">A scenario is a Python file. Those shipped with the code live in <span class="mono">{{ builtin_dir }}</span>; those you deposit live in <span class="mono">{{ deposited_dir }}</span>.</p></div>
+  <div class="actions-row"><form method="post" action="/scenarios/reload"><button class="btn" type="submit">Reload</button></form><a class="btn primary" href="/scenarios/new">Deposit a scenario</a></div>
+</div>
+{% if load_errors %}<div class="flash err"><b>Files with errors:</b>{% for file, msg in load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}</div>{% endif %}
+<section class="panel">
+<div class="tw"><table class="t">
+  <thead><tr><th>Scenario</th><th>Origin</th><th>Schedule</th><th>Next run</th><th>Last run</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{{ '' if r.enabled else 'off' }}">
+    <td><a href="/scenarios/{{ r.spec.key }}"><b>{{ r.spec.name }}</b></a><div class="muted small">{{ r.spec.description }}</div></td>
+    <td class="small">{{ r.spec.source | source_label }}{% if r.version %} · v{{ r.version }}{% endif %}</td>
+    <td>{% if not r.enabled %}<span class="pill none"><i class="dot"></i>Disabled</span>{% elif r.schedule %}<span class="mono">{{ r.schedule }}</span>{% else %}On demand{% endif %}</td>
+    <td>{{ r.next_run | dt if r.next_run else '—' }}</td>
+    <td>{{ r.last.started_at | dt if r.last else '—' }}</td>
+    <td>{% if r.active %}{{ pill(r.active.status) }}{% else %}{{ pill(r.last.status if r.last else none) }}{% endif %}</td>
+    <td class="actions"><form method="post" action="/scenarios/{{ r.spec.key }}/run"><button class="btn small" type="submit" {% if r.active %}disabled{% endif %}>Run</button></form></td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="empty">No scenario loaded.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+</section>
+{% endblock %}

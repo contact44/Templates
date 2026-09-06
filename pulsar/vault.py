@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 
-SERVICE = "astree"
+SERVICE = "pulsar"
 
 
 class Vault:
@@ -34,8 +34,8 @@ class Vault:
     @property
     def backend_label(self) -> str:
         if self.backend == "keyring":
-            return "Gestionnaire d'identifiants du système (keyring)"
-        return f"Fichier chiffré local · {self._file_path().name}"
+            return "System credential manager (keyring)"
+        return f"Local encrypted file · {self._file_path().name}"
 
     # -- public --------------------------------------------------------------------------
 

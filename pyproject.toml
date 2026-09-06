@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "astree"
+name = "pulsar"
 version = "0.2.0"
 description = "Local RPA platform: deposited Python scenarios, a named team of robots, a live open space and a performance dashboard"
 readme = "README.md"
@@ -23,13 +23,13 @@ dependencies = [
 dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
-astree = "astree.__main__:main"
+pulsar = "pulsar.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["astree*"]
+include = ["pulsar*"]
 
 [tool.setuptools.package-data]
-astree = ["templates/*.html", "static/*"]
+pulsar = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,4 +1,4 @@
-/* Astrée · open space — pixel-art live view of the scenarios and the team. No dependencies, no assets: every sprite is drawn from strings. */
+/* Samsung Pulsar · open space — pixel-art live view of the scenarios and the team. No dependencies, no assets: every sprite is drawn from strings. */
 window.Atelier = (function () {
   "use strict";
 
@@ -241,14 +241,14 @@ window.Atelier = (function () {
     ctx.fillStyle = "#BFD4F5"; ctx.fillRect(Math.round(l.w / 2) - 30, 5, 60, 18); ctx.fillStyle = C.w; ctx.fillRect(Math.round(l.w / 2) - 1, 5, 2, 18); ctx.fillRect(Math.round(l.w / 2) - 30, 13, 60, 2);
     ctx.fillStyle = C.q; ctx.fillRect(0, WALL_H - 3, l.w, 3);
     ctx.fillStyle = C.board; ctx.fillRect(8, 6, 74, 18);
-    drawText(ctx, "ASTREE", 13, 10, C.w);
+    drawText(ctx, "SAMSUNG PULSAR", 13, 10, C.w);
     drawText(ctx, "OPEN SPACE", 13, 16, "#BFD4F5");
     var cw = 34, cx = l.w - cw - 8;
     ctx.fillStyle = C.k; ctx.fillRect(cx, 8, cw, 12);
     ctx.fillStyle = C.screen; ctx.fillRect(cx + 1, 9, cw - 2, 10);
-    drawText(ctx, this.clock || "--:--", cx + 4, 11, C.c);
+    drawText(ctx, this.clock || "--:--", cx + 4, 11, C.eye);
     if (this.demo) drawText(ctx, "DEMO", cx - 22, 11, C.ink);
-    if (this.error) drawText(ctx, "HORS LIGNE", cx - 50, 11, C.r);
+    if (this.error) drawText(ctx, "OFFLINE", cx - 38, 11, C.r);
     // stations
     this.rects = [];
     for (var i = 0; i < this.robots.length; i++) this.renderStation(i);
@@ -296,14 +296,14 @@ window.Atelier = (function () {
     ctx.fillStyle = C.board; ctx.fillRect(p.x + 4, p.y + 68, 96, 9);
     drawText(ctx, r.name, p.x + 7, p.y + 70, C.w, 90);
     var line, color;
-    if (off) { line = "ETEINT"; color = C.s; }
-    else if (running) { line = (r.worker ? r.worker.toUpperCase() + " " : "") + (r.step ? r.step.kind.toUpperCase() : "AU TRAVAIL") + " " + (r.items || 0) + (r.errors ? " / " + r.errors + " ECH." : ""); color = C.c; }
-    else if (r.state === "queued") { line = "EN FILE"; color = C.ink; }
-    else if (!r.last) { line = "JAMAIS LANCE"; color = C.ink; }
-    else { line = ({ success: "OK", warning: "RESERVES", error: "ECHEC" }[lastStatus] || lastStatus) + " " + (r.last.items || 0) + " EL."; color = STATUS_COLOR[lastStatus] || C.ink; }
+    if (off) { line = "OFF"; color = C.s; }
+    else if (running) { line = (r.worker ? r.worker.toUpperCase() + " " : "") + (r.step ? r.step.kind.toUpperCase() : "WORKING") + " " + (r.items || 0) + (r.errors ? " / " + r.errors + " FAILED" : ""); color = C.c; }
+    else if (r.state === "queued") { line = "QUEUED"; color = C.ink; }
+    else if (!r.last) { line = "NEVER RUN"; color = C.ink; }
+    else { line = ({ success: "OK", warning: "WARNINGS", error: "FAILED" }[lastStatus] || lastStatus) + " " + (r.last.items || 0) + " ITEMS"; color = STATUS_COLOR[lastStatus] || C.ink; }
     drawText(ctx, line, p.x + 7, p.y + 80, color, 90);
-    if (!off && r.next_run) drawText(ctx, "PROCHAIN " + r.next_run, p.x + 7, p.y + 87, C.s, 90);
-    else if (!off) drawText(ctx, "A LA DEMANDE", p.x + 7, p.y + 87, C.s, 90);
+    if (!off && r.next_run) drawText(ctx, "NEXT " + r.next_run, p.x + 7, p.y + 87, C.s, 90);
+    else if (!off) drawText(ctx, "ON DEMAND", p.x + 7, p.y + 87, C.s, 90);
   };
 
   Scene.prototype.click = function (e) {
@@ -325,16 +325,16 @@ window.Atelier = (function () {
     if (this.status) {
       var self = this;
       this.status.innerHTML = this.robots.map(function (r) {
-        var s = r.state === "running" ? (r.worker ? r.worker + " · " : "") + (r.step ? r.step.kind + (r.step.label ? " · " + r.step.label : "") : "au travail") + " · " + (r.items || 0) + " élément(s)" : r.state === "queued" ? "en file d'attente" : r.state === "off" ? "éteint"
-          : r.last ? ({ success: "réussi", warning: "avec réserves", error: "échec" }[r.last.status] || r.last.status) + " · " + (r.last.items || 0) + " élément(s)" : "jamais lancé";
+        var s = r.state === "running" ? (r.worker ? r.worker + " · " : "") + (r.step ? r.step.kind + (r.step.label ? " · " + r.step.label : "") : "working") + " · " + (r.items || 0) + " item(s)" : r.state === "queued" ? "queued" : r.state === "off" ? "off"
+          : r.last ? ({ success: "success", warning: "with warnings", error: "failed" }[r.last.status] || r.last.status) + " · " + (r.last.items || 0) + " item(s)" : "never run";
         return "<div><b>" + esc(r.name) + "</b><span>" + esc(s) + "</span></div>";
       }).join("");
     }
     if (this.feed) {
       this.feed.innerHTML = this.events.map(function (e) {
-        var label = { success: "Réussi", warning: "Avec réserves", error: "Échec", running: "En cours" }[e.status] || e.status;
+        var label = { success: "Success", warning: "With warnings", error: "Failed", running: "Running", queued: "Queued" }[e.status] || e.status;
         return '<li><a href="/runs/' + e.id + '"><div class="row"><b>' + esc(e.scenario_name) + (e.worker ? ' <span class="muted">· ' + esc(e.worker) + '</span>' : '') + '</b><span class="pill ' + esc(e.status) + '"><i class="dot"></i>' + label + '</span></div><div class="muted">' + esc(e.started) + ' · ' + esc(e.message || "") + '</div></a></li>';
-      }).join("") || '<li class="empty">Rien pour le moment.</li>';
+      }).join("") || '<li class="empty">Nothing yet.</li>';
     }
   };
 

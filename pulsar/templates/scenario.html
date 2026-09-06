@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill, worker_name %}
+{% block title %}{{ scenario.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumb"><a href="/scenarios">Scenarios</a> / <span class="mono">{{ scenario.key }}</span> · {{ scenario.source | source_label }}</div><h1>{{ scenario.name }}</h1><p class="sub">{{ scenario.description }}</p></div>
+  <div class="actions-row">
+    <a class="btn" href="/scenarios/new?replacing={{ scenario.key }}">New version</a>
+    <form method="post" action="/scenarios/{{ scenario.key }}/run"><button class="btn primary" type="submit" {% if active %}disabled{% endif %}>{{ (active.status | status_label) ~ '…' if active else 'Run now' }}</button></form>
+  </div>
+</div>
+<section class="tiles four">
+  <div class="tile"><div class="k">Success · 7 days</div><div class="v">{% if rate is none %}—{% else %}{{ rate }} %{% endif %}</div><div class="d">{{ runs_7d }} run(s)</div></div>
+  <div class="tile"><div class="k">Average duration · 7 days</div><div class="v">{{ avg_ms | ms }}</div><div class="d">per run</div></div>
+  <div class="tile"><div class="k">Items processed · 7 days</div><div class="v">{{ items_7d | n }}</div><div class="d">{{ total_runs | n }} runs in total</div></div>
+  <div class="tile"><div class="k">Next run</div><div class="v small">{% if not enabled %}Disabled{% elif next_run %}{{ next_run | dt }}{% elif schedule %}Invalid schedule{% else %}On demand{% endif %}</div><div class="d">{{ 'cron ' ~ schedule if schedule else 'no schedule' }}</div></div>
+</section>
+<div class="two-col">
+  <div>
+  <section class="panel">
+    <div class="panel-head"><h2>Configuration</h2></div>
+    <form method="post" action="/scenarios/{{ scenario.key }}/config" class="form">
+      <label class="check"><input type="checkbox" name="enabled" {% if enabled %}checked{% endif %}> Scenario enabled (scheduling and runs allowed)</label>
+      <label>Schedule (cron, 5 fields, local time)<input type="text" name="schedule" value="{{ schedule }}" placeholder="e.g. 0 7 28 * *" class="mono" autocomplete="off">
+        <span class="help">Empty = on demand. <span class="mono">0 7 28 * *</span> the 28th at 07:00 · <span class="mono">*/15 8-19 * * 1-5</span> every 15 min on weekdays.</span></label>
+      {% if scenario.params %}<h3>Parameters</h3>{% endif %}
+      {% for p in scenario.params %}{% set v = params.get(p.name) %}
+        {% if p.type == 'bool' %}<label class="check"><input type="checkbox" name="{{ p.name }}" {% if v %}checked{% endif %}> {{ p.label }}{% if p.help %}<span class="help">{{ p.help }}</span>{% endif %}</label>
+        {% elif p.type == 'choice' %}<label>{{ p.label }}<select name="{{ p.name }}">{% for c in p.choices %}<option value="{{ c }}" {% if c == v %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>{% if p.help %}<span class="help">{{ p.help }}</span>{% endif %}</label>
+        {% elif p.type == 'text' %}<label>{{ p.label }}<textarea name="{{ p.name }}" rows="4">{{ v if v is not none else '' }}</textarea>{% if p.help %}<span class="help">{{ p.help }}</span>{% endif %}</label>
+        {% else %}<label>{{ p.label }}<input type="{{ 'number' if p.type in ('int','float') else 'text' }}" {% if p.type == 'float' %}step="any"{% endif %} name="{{ p.name }}" value="{{ v if v is not none else '' }}">{% if p.help %}<span class="help">{{ p.help }}</span>{% endif %}</label>{% endif %}
+      {% endfor %}
+      <div class="form-foot"><button class="btn primary" type="submit">Save</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Versions</h2>{% if scenario.actions %}<span class="muted small">actions: {{ scenario.actions | join(', ') }}</span>{% endif %}</div>
+    {% if not versions %}<p class="empty">{% if scenario.source == 'builtin' %}Shipped with the code: its versions are managed in the Git repository.{% else %}No version saved.{% endif %}</p>{% endif %}
+    <ul class="list">{% for v in versions %}<li><div class="row"><b>Version {{ v.version }}{% if loop.first %} <span class="pill success"><i class="dot"></i>current</span>{% endif %}</b>{% if not loop.first %}<form method="post" action="/scenarios/{{ scenario.key }}/versions/{{ v.version }}/restore"><button class="btn small" type="submit">Restore</button></form>{% endif %}</div><div class="muted">{{ v.created_at | dt }}{% if v.note %} · {{ v.note }}{% endif %} · <span class="mono">{{ v.sha256[:10] }}</span></div></li>{% endfor %}</ul>
+    {% if scenario.source == 'deposited' %}<form method="post" action="/scenarios/{{ scenario.key }}/remove" class="form-foot" onsubmit="return confirm('Remove this scenario? Its versions are kept.')"><button class="btn small" type="submit">Remove scenario</button></form>{% endif %}
+  </section>
+  </div>
+  <div>
+  <section class="panel">
+    <div class="panel-head"><h2>Latest runs</h2><a class="btn small" href="/runs?scenario={{ scenario.key }}">Full history</a></div>
+    <div class="tw"><table class="t"><thead><tr><th>#</th><th>Robot</th><th>Started</th><th>Trigger</th><th>Duration</th><th>Items</th><th>Status</th></tr></thead><tbody>
+      {% for r in runs %}<tr><td><a href="/runs/{{ r.id }}" class="mono">{{ r.id }}</a></td><td>{{ worker_name(r.worker, team_names()) }}</td><td>{{ r.started_at | dt }}</td><td>{{ r.trigger | trigger_label }}</td><td class="num">{{ r.duration_ms | ms }}</td><td class="num">{{ r['items'] | n }}{% if r.errors %} <span class="muted">/ {{ r.errors }} failed</span>{% endif %}</td><td>{{ pill(r.status) }}</td></tr>
+      {% else %}<tr><td colspan="7" class="empty">Never run.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Current code</h2><span class="muted small mono">{{ scenario.path.name }}</span></div>
+    <pre class="contract">{{ code }}</pre>
+  </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% if active %}<script>setTimeout(function () { location.reload(); }, 5000);</script>{% endif %}{% endblock %}

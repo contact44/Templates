@@ -10,7 +10,7 @@ from .config import DEFAULT_TEAM
 from .db import Database
 from .runner import Runner
 
-log = logging.getLogger("astree.team")
+log = logging.getLogger("pulsar.team")
 
 
 class Team:
@@ -35,9 +35,9 @@ class Team:
     def rename(self, names: list[str]) -> None:
         clean = [n.strip() for n in names if n and n.strip()]
         if not clean:
-            raise ValueError("Il faut au moins un robot.")
+            raise ValueError("At least one robot is required.")
         if len(clean) > 8:
-            raise ValueError("Huit robots au maximum.")
+            raise ValueError("Eight robots at most.")
         self.db.set_setting("team_names", clean)
 
     @property
@@ -51,7 +51,7 @@ class Team:
             return
         for i in range(self.size):
             self._busy[i] = None
-            t = threading.Thread(target=self._loop, args=(i,), name=f"astree-worker-{i}", daemon=True)
+            t = threading.Thread(target=self._loop, args=(i,), name=f"pulsar-worker-{i}", daemon=True)
             t.start()
             self._threads.append(t)
         for run in self.db.queued_runs():  # runs queued before a restart
@@ -70,7 +70,7 @@ class Team:
             try:
                 self.runner.execute(run_id, worker=index)
             except Exception:
-                log.exception("robot %s : erreur inattendue sur l'exécution %s", index, run_id)
+                log.exception("robot %s: unexpected error on run %s", index, run_id)
             finally:
                 self._busy[index] = None
                 self._queue.task_done()
@@ -80,7 +80,7 @@ class Team:
     def enqueue(self, scenario_key: str, trigger: str) -> int | None:
         """Queue a run for the first free robot. Returns None if the scenario is already queued or running."""
         if self.db.active_run(scenario_key):
-            log.warning("[%s] déjà en file ou en cours, demande ignorée (%s)", scenario_key, trigger)
+            log.warning("[%s] already queued or running, request ignored (%s)", scenario_key, trigger)
             return None
         run_id = self.db.create_run(scenario_key, trigger)
         if self.inline:

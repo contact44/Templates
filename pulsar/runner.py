@@ -14,7 +14,7 @@ from .db import Database
 from .registry import Registry, ScenarioSpec
 from .vault import Vault, mask
 
-log = logging.getLogger("astree.runner")
+log = logging.getLogger("pulsar.runner")
 
 
 class Credential:
@@ -52,7 +52,7 @@ class _Step:
 
     def __iter__(self):
         if self.iterable is None:
-            raise TypeError("ctx.step(...) sans itérable ne s'utilise qu'avec « with »")
+            raise TypeError("ctx.step(...) without an iterable is only usable with 'with'")
         with self:
             for item in self.iterable:
                 yield item
@@ -67,7 +67,7 @@ class RunContext:
         self.scenario = scenario
         self.params = params
         self.workspace = workspace
-        self.output_dir = workspace / "sorties" / scenario.key
+        self.output_dir = workspace / "outputs" / scenario.key
         self.items = 0
         self.errors = 0
         self.metrics: dict[str, Any] = {}
@@ -115,7 +115,7 @@ class RunContext:
         """Username and password stored in the vault under `name`. Raises KeyError when missing."""
         meta = self._db.credential(name)
         if meta is None:
-            raise KeyError(f"identifiant « {name} » absent du coffre : ajoutez-le dans Paramètres › Identifiants")
+            raise KeyError(f"credential '{name}' is not in the vault: add it under Settings > Credentials")
         password = self._vault.get_password(name) if self._vault else None
         if password:
             self._secrets.append(password)
@@ -146,17 +146,17 @@ class Runner:
         """Run an already created (queued) run to completion on the calling thread. Returns the finished run."""
         run = self.db.run(run_id)
         if run is None:
-            raise KeyError(f"exécution inconnue : {run_id}")
+            raise KeyError(f"unknown run: {run_id}")
         scenario = self.registry.get(run["scenario_key"])
         self.db.start_run(run_id, worker)
         if scenario is None:
-            self.db.finish_run(run_id, dbm.STATUS_ERROR, message=f"Scénario inconnu : {run['scenario_key']}")
+            self.db.finish_run(run_id, dbm.STATUS_ERROR, message=f"Unknown scenario: {run['scenario_key']}")
             return self.db.run(run_id)
         config = self.db.get_config(scenario.key)
         params = {**scenario.defaults(), **(config["params"] if config else {})}
         ctx = RunContext(run_id, scenario, params, self.db, self.workspace, self.vault, on_progress=self._record)
         self._record(ctx)
-        ctx.log(f"Démarrage · {scenario.name} · déclenchement {run['trigger']}")
+        ctx.log(f"Started · {scenario.name} · trigger: {run['trigger']}")
         clock = time.perf_counter()
         try:
             try:
@@ -169,8 +169,8 @@ class Runner:
                                    duration_ms=int((time.perf_counter() - clock) * 1000))
                 return self.db.run(run_id)
             status = dbm.STATUS_WARNING if ctx.errors else dbm.STATUS_SUCCESS
-            summary = f"{ctx.items} élément(s) traité(s)" + (f", {ctx.errors} en échec" if ctx.errors else "")
-            ctx.log(f"Terminé · {summary}")
+            summary = f"{ctx.items} item(s) processed" + (f", {ctx.errors} failed" if ctx.errors else "")
+            ctx.log(f"Finished · {summary}")
             self.db.finish_run(run_id, status, items=ctx.items, errors=ctx.errors, message=summary, metrics=ctx.metrics,
                                duration_ms=int((time.perf_counter() - clock) * 1000))
             return self.db.run(run_id)

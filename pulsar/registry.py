@@ -3,15 +3,15 @@
 Contract (module-level names):
 
     KEY = "extraction_selms"                # unique, stable identifier (URLs, database)
-    NAME = "Extraction mensuelle SELMS+"    # display name
+    NAME = "Monthly SELMS+ extraction"      # display name
     DESCRIPTION = "..."                     # one or two sentences
     SCHEDULE = "0 7 28 * *"                 # default cron expression (local time), or None for on-demand only
     ENABLED_BY_DEFAULT = True               # optional; False for a scenario that must be switched on by hand
     PARAMS = [                              # optional, configurable from the interface
-        {"name": "dossier", "label": "Dossier", "type": "str", "default": "factures", "help": "..."},
+        {"name": "folder", "label": "Folder", "type": "str", "default": "invoices", "help": "..."},
     ]
 
-    def run(ctx):                           # the work; see astree.runner.RunContext
+    def run(ctx):                           # the work; see pulsar.runner.RunContext
         ...
 
 Scenarios come from two places: the `scenarios/` directory shipped with the code, and the workspace directory
@@ -30,7 +30,7 @@ from types import ModuleType
 from typing import Any, Callable
 
 PARAM_TYPES = ("str", "int", "float", "bool", "text", "choice")
-ACTION_KINDS = ("mail.lire", "mail.repondre", "doc.lire", "doc.remplir", "web.consulter", "verifier", "propose", "envoyer", "archiver", "attendre")
+ACTION_KINDS = ("mail.read", "mail.reply", "doc.read", "doc.fill", "web.browse", "verify", "propose", "send", "archive", "wait")
 NETWORK_MODULES = {"requests", "httpx", "urllib", "urllib3", "playwright", "selenium", "smtplib", "imaplib", "ftplib", "socket", "paramiko", "aiohttp", "win32com", "msal", "docusign_esign"}
 OUTBOUND_HINTS = ("smtplib", ".Send(", "send_mail", "sendmail", "envelopes.create", ".send(")
 
@@ -53,16 +53,16 @@ class ParamSpec:
             try:
                 return int(str(raw).strip())
             except ValueError:
-                raise ValueError(f"« {self.label} » doit être un nombre entier.")
+                raise ValueError(f"'{self.label}' must be a whole number.")
         if self.type == "float":
             try:
                 return float(str(raw).strip().replace(",", "."))
             except ValueError:
-                raise ValueError(f"« {self.label} » doit être un nombre.")
+                raise ValueError(f"'{self.label}' must be a number.")
         if self.type == "choice":
             value = str(raw)
             if self.choices and value not in self.choices:
-                raise ValueError(f"« {self.label} » doit être l'une des valeurs proposées.")
+                raise ValueError(f"'{self.label}' must be one of the offered values.")
             return value
         return str(raw)
 
@@ -100,9 +100,9 @@ class ScenarioLoadError(Exception):
 
 
 def _load_module(path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(f"astree_scenario_{path.stem}_{abs(hash(str(path)))}", path)
+    spec = importlib.util.spec_from_file_location(f"pulsar_scenario_{path.stem}_{abs(hash(str(path)))}", path)
     if spec is None or spec.loader is None:
-        raise ScenarioLoadError(f"{path.name}: impossible de charger le module")
+        raise ScenarioLoadError(f"{path.name}: the module could not be loaded")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -113,18 +113,18 @@ def _spec_from_module(module: ModuleType, path: Path, source: str) -> ScenarioSp
     key = getattr(module, "KEY", None)
     run = getattr(module, "run", None)
     if not key or not isinstance(key, str):
-        raise ScenarioLoadError(f"{path.name}: KEY manquant")
+        raise ScenarioLoadError(f"{path.name}: KEY is missing")
     if not all(c.isalnum() or c in "_-" for c in key):
-        raise ScenarioLoadError(f"{path.name}: KEY « {key} » ne doit contenir que lettres, chiffres, _ et -")
+        raise ScenarioLoadError(f"{path.name}: KEY '{key}' may only contain letters, digits, _ and -")
     if not callable(run):
-        raise ScenarioLoadError(f"{path.name}: fonction run(ctx) manquante")
+        raise ScenarioLoadError(f"{path.name}: run(ctx) function is missing")
     params: list[ParamSpec] = []
     for raw in getattr(module, "PARAMS", []) or []:
         if "name" not in raw:
-            raise ScenarioLoadError(f"{path.name}: un paramètre n'a pas de nom")
+            raise ScenarioLoadError(f"{path.name}: a parameter has no name")
         ptype = raw.get("type", "str")
         if ptype not in PARAM_TYPES:
-            raise ScenarioLoadError(f"{path.name}: type de paramètre inconnu « {ptype} »")
+            raise ScenarioLoadError(f"{path.name}: unknown parameter type '{ptype}'")
         params.append(ParamSpec(name=raw["name"], label=raw.get("label", raw["name"]), type=ptype, default=raw.get("default"),
                                 help=raw.get("help", ""), choices=list(raw.get("choices", []))))
     return ScenarioSpec(
@@ -195,9 +195,9 @@ def inspect_source(code: str, tmp_dir: Path, existing_keys: dict[str, str], repl
     checks: list[Check] = []
     try:
         compile(code, "<scenario>", "exec")
-        checks.append(Check(True, "Syntaxe Python valide"))
+        checks.append(Check(True, "Valid Python syntax"))
     except SyntaxError as e:
-        checks.append(Check(False, f"Erreur de syntaxe ligne {e.lineno} : {e.msg}", "error"))
+        checks.append(Check(False, f"Syntax error on line {e.lineno}: {e.msg}", "error"))
         return Inspection(checks)
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp = tmp_dir / f"_inspect_{hashlib.sha1(code.encode('utf-8')).hexdigest()[:10]}.py"
@@ -205,47 +205,47 @@ def inspect_source(code: str, tmp_dir: Path, existing_keys: dict[str, str], repl
     try:
         spec = _spec_from_module(_load_module(tmp), tmp, "deposited")
     except Exception as e:
-        checks.append(Check(False, f"Contrat non respecté : {e}", "error"))
+        checks.append(Check(False, f"Contract not met: {e}", "error"))
         return Inspection(checks)
     finally:
         try:
             tmp.unlink()
         except OSError:
             pass
-    checks.append(Check(True, f"Contrat respecté : KEY « {spec.key} », NAME, run(ctx), {len(spec.params)} paramètre(s)"))
+    checks.append(Check(True, f"Contract met: KEY '{spec.key}', NAME, run(ctx), {len(spec.params)} parameter(s)"))
     owner = existing_keys.get(spec.key)
     if owner and spec.key != replacing:
         if owner == "builtin":
-            checks.append(Check(False, f"Clé « {spec.key} » déjà utilisée par un scénario livré avec le code", "error"))
+            checks.append(Check(False, f"Key '{spec.key}' is already used by a scenario shipped with the code", "error"))
         else:
-            checks.append(Check(True, f"Clé « {spec.key} » existante : le dépôt créera une nouvelle version", "warn"))
+            checks.append(Check(True, f"Key '{spec.key}' already exists: saving will create a new version", "warn"))
     elif spec.key == replacing:
-        checks.append(Check(True, f"Nouvelle version du scénario « {spec.key} »"))
+        checks.append(Check(True, f"New version of scenario '{spec.key}'"))
     else:
-        checks.append(Check(True, f"Clé « {spec.key} » disponible"))
+        checks.append(Check(True, f"Key '{spec.key}' is available"))
     if spec.schedule:
         from .scheduler import validate_cron
 
         err = validate_cron(spec.schedule, "Europe/Paris")
-        checks.append(Check(err is None, f"Planification « {spec.schedule} »" + (f" : {err}" if err else " valide"), "error" if err else "ok"))
+        checks.append(Check(err is None, f"Schedule '{spec.schedule}'" + (f": {err}" if err else " is valid"), "error" if err else "ok"))
     else:
-        checks.append(Check(True, "Aucune planification par défaut : à la demande"))
+        checks.append(Check(True, "No default schedule: on demand"))
     actions = spec.actions
     unknown = [a for a in actions if a not in ACTION_KINDS]
     if actions:
-        checks.append(Check(True, f"{len(actions)} action(s) déclarée(s) : {', '.join(actions)}"))
+        checks.append(Check(True, f"{len(actions)} declared action(s): {', '.join(actions)}"))
     else:
-        checks.append(Check(True, "Aucune action déclarée avec ctx.step : le robot travaillera à son bureau", "warn"))
+        checks.append(Check(True, "No action declared with ctx.step: the robot will work at its desk", "warn"))
     if unknown:
-        checks.append(Check(True, f"Action(s) hors catalogue : {', '.join(unknown)} (affichées comme travail au bureau)", "warn"))
+        checks.append(Check(True, f"Action(s) outside the catalogue: {', '.join(unknown)} (shown as desk work)", "warn"))
     imports = imported_modules(code)
     net = [m for m in imports if m in NETWORK_MODULES]
     if net:
-        checks.append(Check(True, f"Accès réseau ou système : {', '.join(net)}", "warn"))
+        checks.append(Check(True, f"Network or system access: {', '.join(net)}", "warn"))
     if any(h in code for h in OUTBOUND_HINTS) and "propose" not in actions:
-        checks.append(Check(True, "Envoi sortant possible sans passer par ctx.propose : vérifiez qu'une validation humaine est prévue", "warn"))
+        checks.append(Check(True, "Possible outbound send without ctx.propose: make sure a human validation is planned", "warn"))
     if "ctx.credentials(" in code:
-        checks.append(Check(True, "Utilise des identifiants du coffre (ctx.credentials)"))
+        checks.append(Check(True, "Uses credentials from the vault (ctx.credentials)"))
     return Inspection(checks, key=spec.key, name=spec.name, schedule=spec.schedule, actions=actions, imports=imports)
 
 
@@ -272,7 +272,7 @@ class Registry:
                     self.errors[path.name] = f"{type(e).__name__}: {e}"
                     continue
                 if spec.key in self.scenarios:
-                    self.errors[path.name] = f"KEY « {spec.key} » déjà utilisée par {self.scenarios[spec.key].path.name}"
+                    self.errors[path.name] = f"KEY '{spec.key}' is already used by {self.scenarios[spec.key].path.name}"
                     continue
                 self.scenarios[spec.key] = spec
         return self
