@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Open space · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>The open space</h1><p class="sub">Every scenario has a desk. When a robot of the team takes it on, its name shows on the desk and the current action above. Click a desk to run the scenario.</p></div>
+  <div class="legend atelier-legend"><span><i class="sw" style="background:var(--running)"></i>Working</span><span><i class="sw success"></i>Success</span><span><i class="sw warning"></i>With warnings</span><span><i class="sw error"></i>Failed</span><span><i class="sw" style="background:var(--muted)"></i>Off</span></div>
+</div>
+<section class="panel atelier-panel">
+  {% if not scenarios %}<p class="empty">No scenario loaded: the open space is empty.</p>{% endif %}
+  <div class="atelier-wrap"><canvas id="atelier" aria-label="Robot open space"></canvas></div>
+  <div class="atelier-status" id="atelier-status" aria-live="polite"></div>
+</section>
+<section class="panel">
+  <div class="panel-head"><h2>What just happened</h2><a class="btn small" href="/runs">History</a></div>
+  <ul class="list" id="atelier-feed"></ul>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/openspace.js"></script>
+<script>
+  Atelier.start({
+    canvas: document.getElementById("atelier"), feed: document.getElementById("atelier-feed"), status: document.getElementById("atelier-status"),
+    poll: function () { return fetch("/api/live", {cache: "no-store"}).then(function (r) { return r.json(); }); },
+    onRun: function (key) { return fetch("/scenarios/" + key + "/run", {method: "POST", redirect: "manual"}); },
+    interval: 2000
+  });
+</script>
+{% endblock %}

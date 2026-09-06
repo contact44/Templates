@@ -1,0 +1,11 @@
+# Decisions log
+
+| Date | Decision |
+|---|---|
+| 2026-09-06 | Platform name: **Samsung Pulsar** (display name; package and CLI: `pulsar`). |
+| 2026-09-06 | First three robots: **Andromede, Orion, Sirius** (editable under Settings > The team). |
+| 2026-09-06 | Interface language: **English**. Scenario contract and action catalogue in English (`mail.read`, `web.browse`, `verify`…). |
+| 2026-09-06 | Scenario 1 (monthly SELMS+ extraction) triggers on the **28th of each month at 07:00** (`0 7 28 * *`), plus "Run now". |
+| 2026-09-06 | Credential vault for the generic employee account: username in the database, password in the system credential manager (Windows) or an encrypted file; read by scenarios with `ctx.credentials(name)`; masked in journals. |
+| 2026-09-05 | Robots are execution slots (a team), not one robot per scenario; three simultaneous scenarios at most by default. |
+| 2026-09-05 | Charter-inspired palette (deep blue accent, cool whites); no logo or brand assets reproduced in the interface. |

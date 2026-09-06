@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1><p class="sub">Set once: the team, the credentials, the locations.</p></div></div>
+<div class="two-col">
+  <div>
+  <section class="panel">
+    <div class="panel-head"><h2>The team</h2></div>
+    <p class="muted small">A robot is an execution slot: as many scenarios can run at the same time as there are robots. Names show everywhere; the number of robots changes at the next start.</p>
+    <form method="post" action="/settings/team" class="form">
+      {% for name in team %}<label>Robot {{ loop.index }}<input type="text" name="names" value="{{ name }}" maxlength="24"></label>{% endfor %}
+      <label>Robot {{ team | length + 1 }} (optional)<input type="text" name="names" value="" placeholder="leave empty to keep {{ team | length }} robots" maxlength="24"></label>
+      <div class="form-foot"><button class="btn primary" type="submit">Save names</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Locations</h2></div>
+    <dl class="facts compact">
+      <div><dt>Workspace</dt><dd class="mono">{{ settings.workspace }}</dd></div>
+      <div><dt>Shipped scenarios</dt><dd class="mono">{{ settings.scenarios_dir }}</dd></div>
+      <div><dt>Deposited scenarios</dt><dd class="mono">{{ settings.deposited_dir }}</dd></div>
+      <div><dt>Outputs</dt><dd class="mono">{{ settings.output_dir }}</dd></div>
+      <div><dt>Time zone</dt><dd>{{ settings.timezone }}</dd></div>
+    </dl>
+    <p class="muted small" style="margin-top:.6rem">Set with the environment variables <span class="mono">PULSAR_WORKSPACE</span>, <span class="mono">PULSAR_SCENARIOS</span>, <span class="mono">PULSAR_TZ</span>, <span class="mono">PULSAR_PORT</span>.</p>
+  </section>
+  </div>
+  <div>
+  <section class="panel">
+    <div class="panel-head"><h2>Credentials</h2><span class="pill {{ 'success' if vault_backend == 'keyring' else 'warning' }}"><i class="dot"></i>{{ 'system vault' if vault_backend == 'keyring' else 'encrypted file' }}</span></div>
+    <p class="muted small">Passwords are stored in: <b>{{ vault_label }}</b>.{% if vault_backend != 'keyring' %} No system credential manager is available on this machine: the file is encrypted with a key kept next to it, which protects against casual reading, not against full access to the machine. On Windows the Credential Manager is used automatically.{% endif %} A scenario reads them with <span class="mono">ctx.credentials("name")</span>; the password never appears in the journal.</p>
+    <div class="tw"><table class="t"><thead><tr><th>Name</th><th>Username</th><th>Note</th><th>Updated</th><th></th></tr></thead><tbody>
+      {% for c in credentials %}<tr><td class="mono">{{ c.name }}</td><td>{{ c.username }}</td><td class="muted">{{ c.note or '' }}</td><td>{{ c.updated_at | dt }}</td><td class="actions"><form method="post" action="/settings/credentials/{{ c.name }}/delete" onsubmit="return confirm('Delete credential {{ c.name }}?')"><button class="btn small" type="submit">Delete</button></form></td></tr>
+      {% else %}<tr><td colspan="5" class="empty">No credential saved.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <h3>Add or update</h3>
+    <form method="post" action="/settings/credentials" class="form" autocomplete="off">
+      <label>Name (as the scenario calls it)<input type="text" name="name" placeholder="selms" required class="mono"><span class="help">Example: <span class="mono">selms</span>, then in the scenario <span class="mono">ctx.credentials("selms")</span>.</span></label>
+      <label>Username<input type="text" name="username" placeholder="generic account, e.g. cm@samsung" required autocomplete="off"></label>
+      <label>Password<input type="password" name="password" placeholder="leave empty to keep the current one" autocomplete="new-password"></label>
+      <label>Note<input type="text" name="note" placeholder="e.g. generic employee account for SELMS+"></label>
+      <div class="form-foot"><button class="btn primary" type="submit">Save credential</button></div>
+    </form>
+  </section>
+  </div>
+</div>
+{% endblock %}

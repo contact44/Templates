@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Deposit a scenario · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumb"><a href="/scenarios">Scenarios</a> / new</div><h1>{% if replacing %}New version of '{{ replacing }}'{% else %}Deposit a scenario{% endif %}</h1>
+  <p class="sub">Paste the code or drop a <span class="mono">.py</span> file. "Check" runs the checks without saving anything; "Save" creates a version and loads the scenario.</p></div>
+</div>
+<form method="post" action="/scenarios/deposit" enctype="multipart/form-data" class="deposit">
+  <input type="hidden" name="replacing" value="{{ replacing }}">
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-head"><h2>Code</h2><label class="btn small file-btn">Choose a .py file<input type="file" name="file" accept=".py,text/x-python" onchange="this.form.action.value='check';this.form.submit()"></label></div>
+      <textarea name="code" class="code-editor" rows="24" spellcheck="false" placeholder='KEY = "my_scenario"
+NAME = "My scenario"
+SCHEDULE = "0 7 28 * *"
+
+def run(ctx):
+    with ctx.step("web.browse", "SELMS+"):
+        ...'>{{ code }}</textarea>
+      <label class="note-field">Version note <input type="text" name="note" value="{{ note }}" placeholder="e.g. added the duplicate check"></label>
+      <div class="actions-row"><button class="btn" type="submit" name="action" value="check">Check</button><button class="btn primary" type="submit" name="action" value="save" {% if inspection and not inspection.valid %}disabled{% endif %}>Save version</button></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Checks</h2>{% if inspection %}<span class="pill {{ 'success' if inspection.valid else 'error' }}"><i class="dot"></i>{{ 'ready to save' if inspection.valid else 'needs fixing' }}</span>{% endif %}</div>
+      {% if not inspection %}
+      <p class="muted">The checks appear here: syntax, contract (KEY, NAME, run), key availability, schedule, declared actions, network access, outbound sends, vault credentials.</p>
+      {% else %}
+      <ul class="checks">{% for c in inspection.checks %}<li class="{{ c.level }}"><i></i>{{ c.text }}</li>{% endfor %}</ul>
+      {% if inspection.key %}<dl class="facts compact"><div><dt>Key</dt><dd class="mono">{{ inspection.key }}</dd></div><div><dt>Name</dt><dd>{{ inspection.name }}</dd></div><div><dt>Schedule</dt><dd>{{ inspection.schedule or 'on demand' }}</dd></div>{% if inspection.imports %}<div><dt>Imports</dt><dd class="mono">{{ inspection.imports | join(', ') }}</dd></div>{% endif %}</dl>{% endif %}
+      {% endif %}
+      <h3>Contract reminder</h3>
+      <pre class="contract">KEY = "unique_key"             # letters, digits, _ -
+NAME = "Display name"
+DESCRIPTION = "One sentence."
+SCHEDULE = "0 7 28 * *"        # local cron, or None
+ENABLED_BY_DEFAULT = True      # optional
+PARAMS = [{"name": "folder", "label": "Folder", "type": "str", "default": "inbox"}]
+
+def run(ctx):
+    cred = ctx.credentials("selms")          # vault: cred.username, cred.password
+    with ctx.step("web.browse", "SELMS+"):   # actions: {{ action_kinds | join(', ') }}
+        ...
+    for f in ctx.step("doc.read", "Invoices", files):
+        ctx.item_done()                      # or ctx.item_failed("reason")
+    ctx.metric("rows", 142)
+    path = ctx.output_path("export.xlsx")    # workspace/outputs/&lt;key&gt;/</pre>
+    </section>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill, worker_name %}
+{% block title %}Run #{{ run.id }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumb"><a href="/runs">History</a> / <span class="mono">#{{ run.id }}</span></div>
+    <h1>{% if scenario %}<a href="/scenarios/{{ scenario.key }}">{{ scenario.name }}</a>{% else %}{{ run.scenario_key }}{% endif %}</h1><p class="sub">{{ run.message or '' }}</p></div>
+  {{ pill(run.status) }}
+</div>
+<section class="panel">
+  <dl class="facts">
+    <div><dt>Robot</dt><dd>{{ worker_name(run.worker, team) }}</dd></div>
+    <div><dt>Started</dt><dd>{{ run.started_at | dt }}</dd></div>
+    <div><dt>Finished</dt><dd>{{ run.finished_at | dt if run.finished_at else 'in progress' }}</dd></div>
+    <div><dt>Duration</dt><dd>{{ run.duration_ms | ms }}</dd></div>
+    <div><dt>Trigger</dt><dd>{{ run.trigger | trigger_label }}</dd></div>
+    <div><dt>Items processed</dt><dd>{{ run['items'] | n }}</dd></div>
+    <div><dt>Items failed</dt><dd>{{ run.errors | n }}</dd></div>
+    {% for k, v in run.metrics.items() %}<div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>{% endfor %}
+  </dl>
+</section>
+{% if steps %}
+<section class="panel">
+  <div class="panel-head"><h2>Actions</h2><span class="muted small">{{ steps | length }} declared action(s)</span></div>
+  {% set total = steps | map(attribute='duration_ms') | select('number') | sum %}
+  <div class="timeline">
+    {% for s in steps %}
+    <div class="tl-row">
+      <span class="tl-kind mono">{{ s.kind }}</span>
+      <span class="tl-label">{{ s.label or '' }}</span>
+      <span class="tl-bar"><i class="{{ s.status }}" style="width:{{ (100 * (s.duration_ms or 0) / total) | round(1) if total else 0 }}%"></i></span>
+      <span class="tl-dur num">{{ s.duration_ms | ms }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section class="panel">
+  <div class="panel-head"><h2>Journal</h2></div>
+  <div class="term">{% for l in logs %}<div class="ln {{ l.level }}"><span class="ts">{{ l.ts | dt }}</span><span class="lv">{{ l.level }}</span><span class="msg">{{ l.message }}</span></div>{% else %}<div class="ln">No journal lines.</div>{% endfor %}</div>
+</section>
+{% endblock %}
+{% block scripts %}{% if run.status in ('running', 'queued') %}<script>setTimeout(function () { location.reload(); }, 3000);</script>{% endif %}{% endblock %}
