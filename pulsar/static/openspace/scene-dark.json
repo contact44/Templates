@@ -2,9 +2,9 @@
   "bg": "#20393d",
   "image": {"w": 1200, "h": 896},
   "anchors": {
-    "desk0": {"x": 495, "y": 575, "face": "ul", "pose": "desk"},
-    "desk1": {"x": 615, "y": 515, "face": "ul", "pose": "desk"},
-    "desk2": {"x": 735, "y": 463, "face": "ul", "pose": "desk"},
+    "desk0": {"x": 510, "y": 618, "face": "ul", "pose": "desk"},
+    "desk1": {"x": 635, "y": 558, "face": "ul", "pose": "desk"},
+    "desk2": {"x": 757, "y": 497, "face": "ul", "pose": "desk"},
     "selms": {"x": 240, "y": 540, "face": "ul", "label": "SELMS+", "lx": 212, "ly": 222},
     "outlook": {"x": 214, "y": 640, "face": "ul", "label": "OUTLOOK", "lx": 110, "ly": 618},
     "shared": {"x": 982, "y": 626, "face": "ur", "label": "SHARED", "lx": 1070, "ly": 616},
@@ -29,8 +29,6 @@
     [5, 6]
   ],
   "occluders": [
-    {"name": "chair0", "poly": [[458, 548], [532, 548], [532, 648], [458, 648]], "depth": [[460, 640], [530, 640]], "image": "fg-dark-chair0.png", "x": 458, "y": 548, "w": 75, "h": 101},
-    {"name": "chair1", "poly": [[578, 488], [652, 488], [652, 588], [578, 588]], "depth": [[580, 580], [650, 580]], "image": "fg-dark-chair1.png", "x": 578, "y": 488, "w": 75, "h": 101},
-    {"name": "chair2", "poly": [[698, 436], [772, 436], [772, 536], [698, 536]], "depth": [[700, 530], [770, 530]], "image": "fg-dark-chair2.png", "x": 698, "y": 436, "w": 75, "h": 101}
+
   ]
 }

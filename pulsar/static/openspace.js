@@ -2,7 +2,8 @@
    No dependencies. The rooms and the characters come from the Higgsfield artwork (static/openspace/):
    - background-<theme>.png + scene-<theme>.json: the room, where each station is, the walk graph the robots follow,
      the furniture cut out as foreground pieces (drawn over a robot standing behind them)
-   - sheet-<name>.png: one character in six poses (front, 3/4 front, profile, 3/4 back, back, seated at a desk),
+   - sheet-<name>.png: one character in seven poses (front, 3/4 front, profile, 3/4 back, back, and seated on an
+     office chair seen from the back or the front),
      animated here (walk, run, type, read, coffee, wait); the right-facing views are the left ones mirrored */
 window.Openspace = (function () {
   "use strict";
@@ -347,7 +348,7 @@ window.Openspace = (function () {
   };
 
   function poseFor(r) {
-    if (r.seated) return { name: "seated", flip: horizontal(r.face) === "r" };
+    if (r.seated) return { name: vertical(r.face) === "d" ? "seated_front" : "seated_back", flip: horizontal(r.face) === "r" };
     var v = vertical(r.face), h = horizontal(r.face), diagonal = r.face.length === 2;
     if (!v) return { name: "profile", flip: h === "r" };
     if (diagonal) return { name: v === "u" ? "back34" : "front34", flip: h === "r" };

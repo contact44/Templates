@@ -54,7 +54,19 @@ p{margin:0}
 .topbar nav a{padding:.4rem .85rem;border-radius:999px;color:var(--ink-2);text-decoration:none;font-size:.9rem;white-space:nowrap}
 .topbar nav a:hover{background:var(--line-2);color:var(--ink)}
 .topbar nav a.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
-.topbar .clock{margin-left:auto;color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* light / dark switch: the icon shows the theme you would get by clicking */
+.theme-toggle{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink-2);cursor:pointer;flex:none}
+.theme-toggle:hover{border-color:var(--ink-2);color:var(--ink)}
+.theme-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+.theme-toggle .moon{fill:currentColor;stroke:none}
+.theme-toggle .sun{display:none}
+.theme-toggle .moon{display:block}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .theme-toggle .sun{display:block}:root:not([data-theme="light"]) .theme-toggle .moon{display:none}}
+:root[data-theme="dark"] .theme-toggle .sun{display:block}
+:root[data-theme="dark"] .theme-toggle .moon{display:none}
+:root[data-theme="light"] .theme-toggle .sun{display:none}
+:root[data-theme="light"] .theme-toggle .moon{display:block}
+.topbar .clock{margin-left:12px;color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 .demo-banner{background:var(--warning-soft);color:var(--ink);font-size:.8rem;text-align:center;padding:.4rem 1rem;border-bottom:1px solid var(--line)}
 /* page */
 .page{max-width:1180px;margin:0 auto;padding:26px 28px 64px}
