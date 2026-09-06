@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -85,6 +86,22 @@ class Platform:
             from .demo import seed
 
             seed(self.db, self.registry, team_size=self.team.size)
+
+    def openspace_config(self) -> dict:
+        """Background image and anchors for the open space, when a generated scene has been dropped in static/openspace/."""
+        folder = HERE / "static" / "openspace"
+        config: dict = {"background": None, "anchors": {}}
+        for name in ("background.png", "background.webp", "background.jpg"):
+            if (folder / name).exists():
+                config["background"] = f"/static/openspace/{name}"
+                break
+        anchors = folder / "anchors.json"
+        if config["background"] and anchors.exists():
+            try:
+                config.update(json.loads(anchors.read_text(encoding="utf-8")))
+            except ValueError:
+                logging.getLogger("pulsar").warning("anchors.json is not valid JSON; ignoring it")
+        return config
 
     def start(self) -> None:
         stale = self.db.mark_stale_runs()
@@ -196,7 +213,8 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request):
-        return render(request, "dashboard.html", d=stats.dashboard(platform.db, platform.registry, platform.scheduler, platform.team, tz))
+        return render(request, "dashboard.html", d=stats.dashboard(platform.db, platform.registry, platform.scheduler, platform.team, tz),
+                      openspace_config=platform.openspace_config())
 
     # -- scenarios -----------------------------------------------------------------------------
 
@@ -305,11 +323,11 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
             msg += f" {len(platform.registry.errors)} file(s) with errors."
         return redirect("/scenarios", ok=msg)
 
-    # -- open space ------------------------------------------------------------------------------
+    # -- open space now lives on the dashboard ------------------------------------------------------
 
-    @app.get("/openspace", response_class=HTMLResponse)
-    def openspace(request: Request):
-        return render(request, "openspace.html", scenarios=list(platform.registry), team=platform.team.names)
+    @app.get("/openspace", include_in_schema=False)
+    def openspace_redirect():
+        return RedirectResponse("/")
 
     # -- settings ---------------------------------------------------------------------------------
 
