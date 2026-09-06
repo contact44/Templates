@@ -2,8 +2,8 @@
   "bg": "#61667a",
   "image": {"w": 1200, "h": 896},
   "anchors": {
-    "desk0": {"x": 405, "y": 666, "face": "ul", "pose": "desk"},
-    "desk1": {"x": 612, "y": 624, "face": "ul", "pose": "desk"},
+    "desk0": {"x": 405, "y": 609, "face": "ul", "pose": "desk"},
+    "desk1": {"x": 612, "y": 567, "face": "ul", "pose": "desk"},
     "desk2": {"x": 600, "y": 462, "face": "dr", "pose": "desk"},
     "selms": {"x": 332, "y": 500, "face": "ul", "label": "SELMS+", "lx": 336, "ly": 205},
     "outlook": {"x": 188, "y": 592, "face": "ul", "label": "OUTLOOK", "lx": 150, "ly": 520},
