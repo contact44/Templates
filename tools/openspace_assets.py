@@ -12,7 +12,7 @@ Inputs
 Outputs (pulsar/static/openspace/)
   sheet-<name>.png   sprite sheet, the six poses side by side, feet on the last row of each pose
   chars.json         sheet metadata (where each pose is in the sheet, its size)
-  avatar-<name>.png  96 px portrait for the team list
+  avatar-<name>.png  96 x 128 full-body portrait for the team list
   chair-light-<n>.png office chairs drawn for the light room (the dark room has its own)
   fg-<theme>-<n>.png furniture cut out of the room, drawn over a robot standing behind it
   scene-*.json       updated in place with the placement of the cut-outs and chairs
@@ -111,15 +111,14 @@ def build_sheets() -> dict:
 
 
 def build_avatar(name: str) -> None:
-    """Head and shoulders of the original front view, 96 px square, for the team list."""
+    """The whole character (original front view) in a 3:4 box, for the team list."""
     src = Image.open(SRC / f"{name}.png").convert("RGBA")
     src = src.crop(src.getchannel("A").getbbox())
-    side = int(src.height * 0.42)
-    left = max(0, src.width // 2 - side // 2)
-    face = src.crop((left, 0, left + side, side))
-    out = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    out.paste(face, (0, 0), face)
-    out.resize((96, 96), Image.LANCZOS).save(OUT / f"avatar-{name}.png")
+    h = src.height + 16
+    w = max(src.width + 16, round(h * 3 / 4))
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    out.paste(src, ((w - src.width) // 2, 8), src)
+    out.resize((96, 128), Image.LANCZOS).save(OUT / f"avatar-{name}.png")
 
 
 # ---- rooms ----------------------------------------------------------------------------------------------------------

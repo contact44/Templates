@@ -2,9 +2,9 @@
   "bg": "#20393d",
   "image": {"w": 1200, "h": 896},
   "anchors": {
-    "desk0": {"x": 495, "y": 600, "face": "ul", "pose": "desk"},
-    "desk1": {"x": 615, "y": 545, "face": "ul", "pose": "desk"},
-    "desk2": {"x": 735, "y": 492, "face": "ul", "pose": "desk"},
+    "desk0": {"x": 495, "y": 575, "face": "ul", "pose": "desk"},
+    "desk1": {"x": 615, "y": 515, "face": "ul", "pose": "desk"},
+    "desk2": {"x": 735, "y": 463, "face": "ul", "pose": "desk"},
     "selms": {"x": 240, "y": 540, "face": "ul", "label": "SELMS+", "lx": 212, "ly": 222},
     "outlook": {"x": 214, "y": 640, "face": "ul", "label": "OUTLOOK", "lx": 110, "ly": 618},
     "shared": {"x": 982, "y": 626, "face": "ur", "label": "SHARED", "lx": 1070, "ly": 616},
