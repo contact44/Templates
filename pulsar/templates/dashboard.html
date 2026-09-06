@@ -15,7 +15,7 @@
     <div class="team" id="team">
       {% for w in d.team %}
       <div class="member {{ 'busy' if w.busy else 'free' }}">
-        <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})"><i></i></div>
+        <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})">{% set portrait = openspace_config.avatars[loop.index0 % 3] if openspace_config.avatars else None %}{% if portrait %}<img src="{{ portrait }}" alt="">{% else %}<i></i>{% endif %}</div>
         <div><b>{{ w.name }}</b>
           {% if w.busy %}<div class="muted">{{ w.scenario_name }}{% if w.step %} · {{ w.step.kind }}{% if w.step.label %} · {{ w.step.label }}{% endif %}{% endif %} · {{ w['items'] }} item(s) · <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>
           {% else %}<div class="muted">available</div>{% endif %}
@@ -88,7 +88,7 @@
 {% block scripts %}
 <script src="/static/openspace.js"></script>
 <script>
-  Openspace.start({
+  window.pulsarScene = Openspace.start({
     canvas: document.getElementById("openspace"), team: document.getElementById("team"), queue: document.getElementById("queue"),
     config: {{ openspace_config | tojson }},
     poll: function () { return fetch("/api/live", {cache: "no-store"}).then(function (r) { return r.json(); }); },

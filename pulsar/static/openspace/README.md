@@ -6,10 +6,13 @@ is built from them by `python tools/openspace_assets.py --check <dir>` (sources 
 - `background-light.png` · `background-dark.png` — the isometric room, 1200 px wide, one per theme (the platform
   theme picks the room).
 - `scene-light.json` · `scene-dark.json` — in image pixels: the `anchors` (where a robot stands for each station,
-  `face` = `ul` `ur` `dl` `dr`, the direction it looks; `label`/`lx`/`ly` = the station plate), the walk graph the
-  robots follow (`nodes` + `edges`, so they go round the furniture), and the `occluders`: polygons cut out of the
-  room as `fg-<theme>-<name>.png`, drawn over a robot standing behind their `depth` line (a robot behind a desk or
-  in a chair). Edit the JSON, rerun the tool: it re-cuts the pieces and rewrites the placement fields.
-- `sheet-<name>.png` + `chars.json` — one character per sheet: front view | back view, 38 px tall, feet on the
-  last row; `legs` is the row where the legs start (the engine animates head/torso and each leg separately for the
-  walk and run cycles). The back view is derived from the front one (hair over the face, closed jacket).
+  `face` = `ul` `ur` `dl` `dr`, the direction it looks, `pose: "desk"` = the robot sits there; `label`/`lx`/`ly` =
+  the station plate), the walk graph the robots follow (`nodes` + `edges`, so they go round the furniture), and the
+  `occluders`: polygons cut out of the room as `fg-<theme>-<name>.png`, or `chair: [x, base_y]` for a chair drawn by
+  the tool (`chair-<theme>-<name>.png`, the light room has no chairs of its own); both are drawn over a robot standing
+  behind their `depth` line. Edit the JSON, rerun the tool: it re-cuts the pieces and rewrites the placement fields.
+- `sheet-<name>.png` + `chars.json` — one character per sheet in six poses from the Higgsfield turnaround
+  (front, 3/4 front, profile, 3/4 back, back, seated), about 38 px tall, feet on the last row; the right-facing views
+  are the left ones mirrored by the engine. The text sources `tools/openspace-src/<name>.txt` are the poses cut from
+  the generated sheet and reduced to a 16-colour palette (one digit per pixel), so they can be checked and edited.
+- `avatar-<name>.png` — head-and-shoulders portrait for the team list, cut from the original front view.
