@@ -3,8 +3,10 @@
     python tools/openspace_assets.py [--check <dir>]
 
 Inputs
-  tools/openspace-src/<name>.txt            one character: palette + six poses as text (front, front34, profile,
-                                            back34, back, seated), cut from the Higgsfield turnaround sheets
+  tools/openspace-src/<name>.txt            one character: palette + the standing poses as text (front, front34,
+                                            profile, back34, back), cut from the Higgsfield turnaround sheet
+  tools/openspace-src/<name>-seat.txt       the same character seated on an office chair, generated separately with
+                                            Higgsfield: seated_back and seated_front, the chair included
   tools/openspace-src/<name>.png            the original front view (portraits are cut from it)
   pulsar/static/openspace/background-*.png  the two rooms
   pulsar/static/openspace/scene-*.json      anchors, walk graph, occluder polygons (image pixels)
@@ -13,7 +15,6 @@ Outputs (pulsar/static/openspace/)
   sheet-<name>.png   sprite sheet, the six poses side by side, feet on the last row of each pose
   chars.json         sheet metadata (where each pose is in the sheet, its size)
   avatar-<name>.png  96 x 128 full-body portrait for the team list
-  chair-light-<n>.png office chairs drawn for the light room (the dark room has its own)
   fg-<theme>-<n>.png furniture cut out of the room, drawn over a robot standing behind it
   scene-*.json       updated in place with the placement of the cut-outs and chairs
 --check <dir> also writes overlays showing anchors, graph and occluders on each room.
@@ -31,7 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "openspace-src"
 OUT = ROOT / "pulsar" / "static" / "openspace"
 CHARACTERS = ["andromede", "orion", "sirius"]
-POSES = ["front", "front34", "profile", "back34", "back", "seated"]
+POSES = ["front", "front34", "profile", "back34", "back", "seated_back", "seated_front"]
 DIGITS = "0123456789abcdef"
 
 
@@ -94,6 +95,9 @@ def build_sheets() -> dict:
     meta = {}
     for name in CHARACTERS:
         _, frames = read_sprite_text(SRC / f"{name}.txt")
+        seat = SRC / f"{name}-seat.txt"
+        if seat.exists():
+            frames.update(read_sprite_text(seat)[1])
         height = max(f.height for f in frames.values())
         width = sum(f.width + 1 for f in frames.values()) - 1
         sheet = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -123,60 +127,11 @@ def build_avatar(name: str) -> None:
 
 # ---- rooms ----------------------------------------------------------------------------------------------------------
 
-CHAIR = [  # office chair seen from behind, 3/4, on the room's 4 px pixel grid (18 x 25 cells)
-    "......kkkkkkk.....",
-    "....kkbbbbbbbkk...",
-    "...kbbbbbbbbbbbk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbaaaaaaaaabk..",
-    "...kbbaaaaaaabbk..",
-    "..kkbbbbbbbbbbbkk.",
-    ".kcccbbbbbbbbbcccdk",
-    ".kcccccccccccccccdk",
-    "..kkcccccccccccdkk.",
-    ".....kkkddddkkk....",
-    "........kssk.......",
-    "........kssk.......",
-    "........kssk.......",
-    "......kkkssskkk....",
-    "...kkkssskssksskkk.",
-    "..kssskk.kssk.ksssk",
-    "..kkkk...kkkk..kkkk",
-    "...................",
-]
-CHAIR_COLORS = {"k": (12, 18, 40), "b": (43, 60, 105), "a": (29, 42, 74), "c": (36, 51, 90), "d": (24, 35, 64), "s": (70, 82, 104)}
-
-
-def draw_chair(cell: int = 4) -> Image.Image:
-    w, h = len(CHAIR[0]), len(CHAIR)
-    img = Image.new("RGBA", (w * cell, h * cell), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    for y, row in enumerate(CHAIR):
-        for x, ch in enumerate(row):
-            if ch in CHAIR_COLORS:
-                d.rectangle([x * cell, y * cell, (x + 1) * cell - 1, (y + 1) * cell - 1], fill=CHAIR_COLORS[ch] + (255,))
-    return img
-
-
 def cut_occluders(theme: str) -> dict:
     scene_path = OUT / f"scene-{theme}.json"
     scene = json.loads(scene_path.read_text(encoding="utf-8"))
     room = Image.open(OUT / f"background-{theme}.png").convert("RGBA")
     for occ in scene.get("occluders", []):
-        if occ.get("chair"):                       # a chair drawn here, not cut from the room
-            img = draw_chair()
-            img.save(OUT / f"chair-{theme}-{occ['name']}.png")
-            cx, base = occ["chair"]
-            x0, y0 = cx - img.width // 2, base - img.height
-            occ.update({"image": f"chair-{theme}-{occ['name']}.png", "x": x0, "y": y0, "w": img.width, "h": img.height,
-                        "depth": [[x0, base - 6], [x0 + img.width, base - 6]]})
-            continue
         pts = [tuple(p) for p in occ["poly"]]
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
         x0, y0, x1, y1 = min(xs), min(ys), max(xs) + 1, max(ys) + 1
@@ -214,7 +169,10 @@ def check(theme: str, scene: dict, meta: dict, scratch: Path) -> None:
     for i, (aid, a) in enumerate(scene["anchors"].items()):
         name = CHARACTERS[i % 3]
         m = meta[name]
-        pose = "seated" if a.get("pose") == "desk" else ("back34" if a["face"] in ("ul", "ur") else "front34")
+        if a.get("pose") == "desk":
+            pose = "seated_back" if a["face"] in ("ul", "ur") else "seated_front"
+        else:
+            pose = "back34" if a["face"] in ("ul", "ur") else "front34"
         fr = m["frames"][pose]
         sheet = Image.open(OUT / m["sheet"]).convert("RGBA")
         frame = sheet.crop((fr["x"], m["h"] - fr["h"], fr["x"] + fr["w"], m["h"]))

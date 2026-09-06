@@ -6,6 +6,7 @@
 <title>{% block title %}{{ app_name }}{% endblock %}</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
+<script>(function(){try{var t=localStorage.getItem("pulsar-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 </head>
 <body>
 <header class="topbar">
@@ -16,6 +17,12 @@
     <a href="/settings" class="{{ 'on' if path.startswith('/settings') else '' }}">Settings</a>
     <a href="/runs" class="{{ 'on' if path.startswith('/runs') else '' }}">History</a>
   </nav>
+  <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch theme" title="Switch theme">
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g class="sun"><circle cx="10" cy="10" r="4"></circle><path d="M10 1v3M10 16v3M1 10h3M16 10h3M3.6 3.6l2.1 2.1M14.3 14.3l2.1 2.1M16.4 3.6l-2.1 2.1M5.7 14.3l-2.1 2.1"></path></g>
+      <g class="moon"><path d="M16 12.3A7 7 0 0 1 7.7 4a7 7 0 1 0 8.3 8.3Z"></path></g>
+    </svg>
+  </button>
   <span class="clock">{{ now_label() }}</span>
 </header>
 {% if demo_mode %}<div class="demo-banner">Online preview · fictitious demonstration data · no scheduling (scenarios run on click) · history resets whenever the server wakes up</div>{% endif %}
@@ -24,6 +31,33 @@
   {% if flash_err %}<div class="flash err" role="alert">{{ flash_err }}</div>{% endif %}
   {% block content %}{% endblock %}
 </main>
+<script>
+(function () {
+  var root = document.documentElement, button = document.getElementById("theme-toggle");
+  if (!button) return;
+  function current() {
+    var forced = root.getAttribute("data-theme");
+    if (forced === "light" || forced === "dark") return forced;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function label() {
+    var next = current() === "dark" ? "light" : "dark";
+    button.setAttribute("aria-label", "Switch to the " + next + " theme");
+    button.setAttribute("title", "Switch to the " + next + " theme");
+  }
+  button.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("pulsar-theme", next); } catch (e) {}
+    label();
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", label);
+  }
+  label();
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
