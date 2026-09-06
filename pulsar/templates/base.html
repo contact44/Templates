@@ -9,7 +9,7 @@
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/">{{ app_name }}<span class="dept">{{ department }}</span></a>
+  <a class="brand" href="/"><span class="wordmark">{% if brand_logo %}<img src="{{ brand_logo }}" alt="Samsung">{% else %}SAMSUNG{% endif %}</span><span class="product">Pulsar</span><span class="dept">{{ department }}</span></a>
   <nav>
     <a href="/" class="{{ 'on' if path == '/' else '' }}">Dashboard</a>
     <a href="/scenarios" class="{{ 'on' if path.startswith('/scenarios') else '' }}">Scenarios</a>

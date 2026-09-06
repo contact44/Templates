@@ -92,7 +92,7 @@ class Platform:
         folder = HERE / "static" / "openspace"
         base = "/static/openspace/"
         log = logging.getLogger("pulsar")
-        config: dict = {"light": None, "dark": None, "characters": []}
+        config: dict = {"light": None, "dark": None, "characters": [], "avatars": []}
         for theme in ("light", "dark"):
             image, scene_file = folder / f"background-{theme}.png", folder / f"scene-{theme}.json"
             if not (image.exists() and scene_file.exists()):
@@ -116,7 +116,10 @@ class Platform:
             for name in ("andromede", "orion", "sirius"):
                 meta = chars.get(name)
                 if meta and (folder / meta["sheet"]).exists():
-                    config["characters"].append({"sheet": base + meta["sheet"], "w": meta["w"], "h": meta["h"], "legs": meta["legs"]})
+                    config["characters"].append({"sheet": base + meta["sheet"], "h": meta["h"], "frames": meta["frames"]})
+        for name in ("andromede", "orion", "sirius"):
+            portrait = folder / f"avatar-{name}.png"
+            config["avatars"].append(base + portrait.name if portrait.exists() else None)
         return config
 
     def start(self) -> None:
@@ -201,6 +204,8 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     env.globals["app_name"] = APP_NAME
     env.globals["short_name"] = SHORT_NAME
     env.globals["department"] = DEPARTMENT
+    brand = next((f for f in ("samsung-wordmark.svg", "samsung-wordmark.png") if (HERE / "static" / "brand" / f).exists()), None)
+    env.globals["brand_logo"] = f"/static/brand/{brand}" if brand else None
     env.globals["demo_mode"] = settings.demo
     env.globals["now_label"] = lambda: fmt_long_date(datetime.now(stats.ZoneInfo(tz)))
     env.globals["team_names"] = lambda: platform.team.names

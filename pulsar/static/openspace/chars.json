@@ -1,23 +1,110 @@
 {
-  "andromede": {
-    "sheet": "sheet-andromede.png",
-    "w": 21,
-    "h": 38,
-    "legs": 27,
-    "chin": 17
-  },
-  "orion": {
-    "sheet": "sheet-orion.png",
+ "andromede": {
+  "sheet": "sheet-andromede.png",
+  "h": 38,
+  "frames": {
+   "front": {
+    "x": 0,
+    "w": 19,
+    "h": 38
+   },
+   "front34": {
+    "x": 20,
     "w": 17,
-    "h": 38,
-    "legs": 27,
-    "chin": 17
-  },
-  "sirius": {
-    "sheet": "sheet-sirius.png",
-    "w": 17,
-    "h": 38,
-    "legs": 27,
-    "chin": 17
+    "h": 38
+   },
+   "profile": {
+    "x": 38,
+    "w": 18,
+    "h": 37
+   },
+   "back34": {
+    "x": 57,
+    "w": 16,
+    "h": 37
+   },
+   "back": {
+    "x": 74,
+    "w": 14,
+    "h": 37
+   },
+   "seated": {
+    "x": 89,
+    "w": 19,
+    "h": 32
+   }
   }
+ },
+ "orion": {
+  "sheet": "sheet-orion.png",
+  "h": 38,
+  "frames": {
+   "front": {
+    "x": 0,
+    "w": 17,
+    "h": 38
+   },
+   "front34": {
+    "x": 18,
+    "w": 16,
+    "h": 37
+   },
+   "profile": {
+    "x": 35,
+    "w": 16,
+    "h": 37
+   },
+   "back34": {
+    "x": 52,
+    "w": 16,
+    "h": 37
+   },
+   "back": {
+    "x": 69,
+    "w": 16,
+    "h": 37
+   },
+   "seated": {
+    "x": 86,
+    "w": 19,
+    "h": 35
+   }
+  }
+ },
+ "sirius": {
+  "sheet": "sheet-sirius.png",
+  "h": 38,
+  "frames": {
+   "front": {
+    "x": 0,
+    "w": 17,
+    "h": 38
+   },
+   "front34": {
+    "x": 18,
+    "w": 16,
+    "h": 37
+   },
+   "profile": {
+    "x": 35,
+    "w": 14,
+    "h": 37
+   },
+   "back34": {
+    "x": 50,
+    "w": 14,
+    "h": 37
+   },
+   "back": {
+    "x": 65,
+    "w": 16,
+    "h": 38
+   },
+   "seated": {
+    "x": 82,
+    "w": 18,
+    "h": 35
+   }
+  }
+ }
 }

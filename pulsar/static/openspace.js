@@ -2,7 +2,8 @@
    No dependencies. The rooms and the characters come from the Higgsfield artwork (static/openspace/):
    - background-<theme>.png + scene-<theme>.json: the room, where each station is, the walk graph the robots follow,
      the furniture cut out as foreground pieces (drawn over a robot standing behind them)
-   - sheet-<name>.png: one character, front view | back view, animated here (walk, run, type, read, coffee, wait) */
+   - sheet-<name>.png: one character in six poses (front, 3/4 front, profile, 3/4 back, back, seated at a desk),
+     animated here (walk, run, type, read, coffee, wait); the right-facing views are the left ones mirrored */
 window.Openspace = (function () {
   "use strict";
 
@@ -66,6 +67,17 @@ window.Openspace = (function () {
   var KIND_POSE = { "mail.read": "type", "mail.reply": "type", "doc.read": "read", "doc.fill": "type", "web.browse": "type", "verify": "read", "propose": "wait", "send": "type", "archive": "type", "wait": "coffee" };
   var FRONT_POSES = { read: true, coffee: true, wait: true };   // poses where the robot turns towards the viewer
 
+  // ---- facing: "u" "d" "l" "r" or the diagonals "ul" "ur" "dl" "dr" ----------------------------------------------------
+  function facing(dx, dy, previous) {
+    var ax = Math.abs(dx), ay = Math.abs(dy);
+    if (ax < 0.01 && ay < 0.01) return previous;
+    if (ay < ax * 0.3) return dx < 0 ? "l" : "r";               // nearly horizontal: profile
+    if (ax < ay * 0.3) return dy < 0 ? "u" : "d";               // nearly vertical: straight front or back
+    return (dy < 0 ? "u" : "d") + (dx < 0 ? "l" : "r");          // the isometric diagonals: 3/4 views
+  }
+  function vertical(face) { return face[0] === "u" ? "u" : (face[0] === "d" ? "d" : ""); }
+  function horizontal(face) { var c = face[face.length - 1]; return c === "l" || c === "r" ? c : "r"; }
+
   // ---- scene ---------------------------------------------------------------------------------------------------------
   function Scene(opts) {
     this.canvas = opts.canvas;
@@ -76,18 +88,19 @@ window.Openspace = (function () {
     this.queueEl = opts.queue;
     this.config = opts.config || {};
     this.rooms = { light: null, dark: null };   // loaded rooms: {img, scene, pieces:[{img,x,y,w,h,line}], anchors, nodes, edges}
-    this.sheets = [];                            // [{img, w, h, legs}]
+    this.sheets = [];                            // [{img, h, frames: {front, front34, profile, back34, back, seated: {x, w, h}}}]
     this.theme = detectTheme();
     this.room = null;
     this.frame = 0; this.lastTick = 0;
     this.robots = []; this.queued = []; this.events = []; this.particles = [];
+    this.toasts = []; this.seenEvents = null;   // quest-style notices for finished runs, keyed on the run ids already shown
     this.clock = ""; this.demo = false; this.error = null;
     this.H = Math.round(W * 896 / 1200);
     var self = this;
     ["light", "dark"].forEach(function (t) { var cfg = self.config[t]; if (cfg && cfg.background && cfg.scene) self.loadRoom(t, cfg); });
     (this.config.characters || []).forEach(function (ch, i) {
       if (!ch || !ch.sheet) return;
-      var img = new Image(); img.onload = function () { self.sheets[i] = { img: img, w: ch.w, h: ch.h, legs: ch.legs }; }; img.src = ch.sheet;
+      var img = new Image(); img.onload = function () { self.sheets[i] = { img: img, h: ch.h, frames: ch.frames || {} }; }; img.src = ch.sheet;
     });
     this.canvas.width = W * SCALE; this.canvas.height = this.H * SCALE;
     this.canvas.style.maxWidth = (W * SCALE) + "px";
@@ -147,7 +160,7 @@ window.Openspace = (function () {
   };
   Scene.prototype.place = function (r, station) {   // teleport (first appearance, theme change)
     var a = this.anchor(station, r);
-    r.x = a.x; r.y = a.y; r.face = a.face; r.path = []; r.station = station; r.moving = false;
+    r.x = a.x; r.y = a.y; r.face = a.face; r.path = []; r.station = station; r.moving = false; r.target = a; r.seated = a.pose === "desk";
   };
   Scene.prototype.nearestNode = function (x, y) {
     var nodes = this.room.nodes, best = -1, bd = Infinity;
@@ -190,6 +203,13 @@ window.Openspace = (function () {
   Scene.prototype.update = function (data) {
     var now = Date.now(), self = this;
     this.clock = data.clock || ""; this.demo = !!data.demo; this.queued = data.queued || []; this.events = data.events || [];
+    var known = this.seenEvents, first = known === null;
+    if (first) known = this.seenEvents = {};
+    this.events.forEach(function (ev) {
+      if (!ev || ev.id == null || known[ev.id]) return;
+      known[ev.id] = true;
+      if (!first) self.toast(ev);
+    });
     var team = data.team || [];
     team.forEach(function (w, idx) {
       var r = self.robots[idx];
@@ -215,6 +235,40 @@ window.Openspace = (function () {
     this.renderDom();
   };
 
+  var TOAST = {
+    success: { title: "QUEST COMPLETE", color: C.green },
+    warning: { title: "QUEST COMPLETE", color: C.amber, sub: "WITH WARNINGS" },
+    error: { title: "QUEST FAILED", color: C.red }
+  };
+  Scene.prototype.toast = function (ev) {
+    var kind = TOAST[ev.status] ? ev.status : "success", now = Date.now();
+    var detail = (ev.worker ? ev.worker + " · " : "") + (ev.items != null ? ev.items + " item(s)" : "");
+    if (kind === "error" && ev.message) detail = String(ev.message).slice(0, 34);
+    this.toasts.push({ kind: kind, title: TOAST[kind].title + (TOAST[kind].sub ? " · " + TOAST[kind].sub : ""), name: ev.scenario_name || "Scenario", detail: detail, born: now, until: now + 7000 });
+    if (this.toasts.length > 3) this.toasts.shift();
+  };
+  Scene.prototype.drawToasts = function () {
+    var ctx = this.ctx, now = Date.now(), self = this;
+    this.toasts = this.toasts.filter(function (t) { return t.until > now; });
+    var y = this.H - 6;
+    this.toasts.slice().reverse().forEach(function (t) {
+      var w = Math.max(118, textWidth(t.title) + 22, textWidth(t.name) + 22, textWidth(t.detail) + 22), h = 27;
+      var age = now - t.born, left = t.until - now;
+      var slide = age < 250 ? Math.round((1 - age / 250) * (w + 8)) : (left < 250 ? Math.round((1 - left / 250) * (w + 8)) : 0);
+      var x = W - 4 - w + slide;
+      y -= h;
+      ctx.fillStyle = "rgba(11,18,32,.94)"; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = TOAST[t.kind].color; ctx.fillRect(x, y, 3, h); ctx.fillRect(x + 3, y, w - 3, 1);
+      var icon = ICONS[t.kind]; if (icon) drawSprite(ctx, icon, x + 7, y + 4, { g: C.green, a: C.amber, r: C.red });
+      drawText(ctx, t.title, x + 16, y + 4, TOAST[t.kind].color, w - 20);
+      drawText(ctx, t.name, x + 6, y + 12, C.w, w - 10);
+      drawText(ctx, t.detail, x + 6, y + 19, C.muted, w - 10);
+      // a little sparkle for a success, in the first second
+      if (t.kind !== "error" && age < 900 && Math.floor(age / 150) % 2 === 0) { ctx.fillStyle = C.w; ctx.fillRect(x + w - 6, y + 3, 1, 1); ctx.fillRect(x + w - 9, y + 7, 1, 1); ctx.fillRect(x + w - 4, y + 9, 1, 1); }
+      y -= 3;
+    });
+  };
+
   Scene.prototype.spawnPaper = function (r) { this.particles.push({ type: "paper", x: r.x + 3, y: r.y - 22, vx: 1.2 + Math.random() * 0.6, vy: -1.1, life: 14, t: 0 }); };
   Scene.prototype.spawnSmoke = function (r, n) { for (var k = 0; k < (n || 1); k++) this.particles.push({ type: "smoke", x: r.x - 2 + Math.random() * 5, y: r.y - 36, vx: (Math.random() - 0.5) * 0.4, vy: -0.4 - Math.random() * 0.3, life: 20 + Math.random() * 10, t: 0 }); };
 
@@ -229,17 +283,18 @@ window.Openspace = (function () {
           var p = r.path[0], dx = p.x - r.x, dy = p.y - r.y, d = Math.hypot(dx, dy);
           if (d <= left) { r.x = p.x; r.y = p.y; r.path.shift(); left -= d; }
           else { r.x += dx / d * left; r.y += dy / d * left; left = 0; }
-          if (d > 0.01) r.face = (dy < -0.05 ? "u" : dy > 0.05 ? "d" : r.face[0]) + (dx < -0.05 ? "l" : dx > 0.05 ? "r" : r.face[1]);
+          if (d > 0.01) r.face = facing(dx, dy, r.face);
         }
         if (!r.path.length) { r.moving = false; r.face = r.target ? r.target.face : r.face; r.phase = 0; }
         else if (f % (r.running ? 2 : 4) === 0) r.phase = (r.phase + 1) % 4;
-        r.pose = r.running ? "run" : "walk";
+        r.pose = r.running ? "run" : "walk"; r.seated = false;
       } else {
         var kind = r.step && r.step.kind;
         r.pose = r.busy ? ((kind && KIND_POSE[kind]) || "type") : "idle";
         var anchorFace = r.target ? r.target.face : r.face;
-        var front = FRONT_POSES[r.pose] || (r.fresh && r.freshUntil > now) || r.lookUntil > now;
-        r.face = (front ? "d" : anchorFace[0]) + anchorFace[1];
+        r.seated = !!(r.target && r.target.pose === "desk");
+        var front = !r.seated && (FRONT_POSES[r.pose] || (r.fresh && r.freshUntil > now) || r.lookUntil > now);
+        r.face = front ? "d" + horizontal(anchorFace) : anchorFace;
         if (!r.busy && r.lookUntil <= now && now > r.nextLook) { r.lookUntil = now + 1800 + Math.random() * 1200; r.nextLook = now + 9000 + Math.random() * 16000; }
       }
       if (r.fresh === "error" && r.freshUntil > now && f % 3 === 0) self.spawnSmoke(r, 1);
@@ -278,6 +333,7 @@ window.Openspace = (function () {
     plate(ctx, qtext, W - cw - 10 - textWidth(qtext), 7, C.w, C.plate);
     if (this.demo) drawText(ctx, "DEMO", 8, 26, C.amber);
     if (this.error) drawText(ctx, "OFFLINE", W - 34, 20, C.red);
+    this.drawToasts();
   };
 
   Scene.prototype.depth = function (it) {
@@ -290,36 +346,48 @@ window.Openspace = (function () {
     return y - 0.5;
   };
 
+  function poseFor(r) {
+    if (r.seated) return { name: "seated", flip: horizontal(r.face) === "r" };
+    var v = vertical(r.face), h = horizontal(r.face), diagonal = r.face.length === 2;
+    if (!v) return { name: "profile", flip: h === "r" };
+    if (diagonal) return { name: v === "u" ? "back34" : "front34", flip: h === "r" };
+    return { name: v === "u" ? "back" : "front", flip: false };
+  }
   Scene.prototype.drawRobot = function (r) {
     var ctx = this.ctx, f = this.frame, sheet = this.sheets[r.index % Math.max(1, this.sheets.length)];
     var x = Math.round(r.x), y = Math.round(r.y);
     ctx.fillStyle = "rgba(0,0,0,.32)"; ctx.fillRect(x - 5, y - 1, 10, 2);
-    if (!sheet) { ctx.fillStyle = C.blue; ctx.fillRect(x - 4, y - 20, 8, 20); return; }
-    var w = sheet.w, h = sheet.h, legs = sheet.legs, back = r.face[0] === "u", flip = back ? r.face[1] === "r" : r.face[1] === "l";
-    var sx = back ? w : 0, left = x - Math.floor(w / 2), top = y - h;
+    var pose = poseFor(r), fr = sheet && sheet.frames[pose.name];
+    if (!fr) { ctx.fillStyle = C.blue; ctx.fillRect(x - 4, y - 20, 8, 20); return; }
+    var w = fr.w, h = fr.h, sx = fr.x, sy = sheet.h - h, left = x - Math.floor(w / 2), top = y - h;
     var moving = r.pose === "walk" || r.pose === "run", stride = r.pose === "run" ? 2 : 1;
     var bob = moving ? ((r.phase === 1 || r.phase === 3) ? -stride : 0) : (r.pose === "type" ? (f % 10 < 2 ? 1 : 0) : 0);
-    var liftL = moving && r.phase === 0 ? stride : 0, liftR = moving && r.phase === 2 ? stride : 0;
-    var lean = r.pose === "run" ? 1 : 0, mid = Math.ceil(w / 2);
     ctx.save();
-    if (flip) { ctx.translate(x * 2, 0); ctx.scale(-1, 1); }
-    // head and torso, then each leg (a lifted leg is drawn one or two rows shorter: the foot leaves the ground)
-    ctx.drawImage(sheet.img, sx, 0, w, legs, left + lean, top + bob, w, legs);
-    ctx.drawImage(sheet.img, sx, legs + liftL, mid, h - legs - liftL, left, top + bob + legs, mid, h - legs - liftL);
-    ctx.drawImage(sheet.img, sx + mid, legs + liftR, w - mid, h - legs - liftR, left + mid, top + bob + legs, w - mid, h - legs - liftR);
+    if (pose.flip) { ctx.translate(x * 2, 0); ctx.scale(-1, 1); }
+    if (moving) {
+      // head and torso, then each leg (a lifted leg is drawn one or two rows shorter: the foot leaves the ground)
+      var legs = Math.round(h * 0.72), mid = Math.ceil(w / 2), lean = r.pose === "run" ? 1 : 0;
+      var liftL = r.phase === 0 ? stride : 0, liftR = r.phase === 2 ? stride : 0;
+      ctx.drawImage(sheet.img, sx, sy, w, legs, left + lean, top + bob, w, legs);
+      ctx.drawImage(sheet.img, sx, sy + legs + liftL, mid, h - legs - liftL, left, top + bob + legs, mid, h - legs - liftL);
+      ctx.drawImage(sheet.img, sx + mid, sy + legs + liftR, w - mid, h - legs - liftR, left + mid, top + bob + legs, w - mid, h - legs - liftR);
+    } else {
+      ctx.drawImage(sheet.img, sx, sy, w, h, left, top + bob, w, h);
+    }
     ctx.restore();
     // what the robot holds
-    var hy = top + Math.round(h * 0.42);
-    if (r.pose === "read") { var py = hy + (f % 8 < 4 ? 0 : 1); ctx.fillStyle = C.paper; ctx.fillRect(x - 4, py, 8, 9); ctx.fillStyle = C.ink; ctx.fillRect(x - 2, py + 2, 4, 1); ctx.fillRect(x - 2, py + 4, 4, 1); ctx.fillRect(x - 2, py + 6, 3, 1); }
-    else if (r.pose === "coffee") { var cx = x + (r.face[1] === "l" ? -6 : 3), cy = hy - (f % 16 < 4 ? 2 : 0); ctx.fillStyle = C.cup; ctx.fillRect(cx, cy, 4, 4); ctx.fillStyle = C.k; ctx.fillRect(cx + (r.face[1] === "l" ? -1 : 4), cy + 1, 1, 2); if (f % 10 < 5) { ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(cx + 1, cy - 3, 1, 2); } }
-    else if (r.pose === "type" && back && f % 4 < 2) { ctx.fillStyle = C.neon; ctx.fillRect(x - 3 + (f % 3), top + legs - 2, 1, 1); }
+    var hy = top + Math.round(h * 0.42), back = vertical(r.face) === "u";
+    if (r.pose === "read" && !r.seated) { var py = hy + (f % 8 < 4 ? 0 : 1); ctx.fillStyle = C.paper; ctx.fillRect(x - 4, py, 8, 9); ctx.fillStyle = C.ink; ctx.fillRect(x - 2, py + 2, 4, 1); ctx.fillRect(x - 2, py + 4, 4, 1); ctx.fillRect(x - 2, py + 6, 3, 1); }
+    else if (r.pose === "coffee") { var cx = x + (horizontal(r.face) === "l" ? -6 : 3), cy = hy - (f % 16 < 4 ? 2 : 0); ctx.fillStyle = C.cup; ctx.fillRect(cx, cy, 4, 4); ctx.fillStyle = C.k; ctx.fillRect(cx + (horizontal(r.face) === "l" ? -1 : 4), cy + 1, 1, 2); if (f % 10 < 5) { ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(cx + 1, cy - 3, 1, 2); } }
+    else if ((r.pose === "type" || (r.seated && r.busy)) && back && f % 4 < 2) { ctx.fillStyle = C.neon; ctx.fillRect(x - 3 + (f % 3), top + Math.round(h * 0.7), 1, 1); }
     else if (r.pose === "wait" && f % 14 < 8) drawSprite(ctx, ICONS.question, x + 12, top - 6, { "#": C.amber });
-    if (r.pose === "idle" && !r.busy && r.lookUntil <= Date.now() && r.face[0] === "u" && f % 60 < 8) drawSprite(ctx, ICONS.zz, x + 12, top - 4, { "#": C.muted });
+    if (r.pose === "idle" && !r.busy && r.lookUntil <= Date.now() && back && f % 60 < 8) drawSprite(ctx, ICONS.zz, x + 12, top - 4, { "#": C.muted });
   };
 
   Scene.prototype.drawPlates = function (r) {
     // like a game: the name floats over the head, the current action above it
-    var ctx = this.ctx, x = Math.round(r.x), y = Math.round(r.y), top = y - (this.sheets[0] ? this.sheets[0].h : 38);
+    var ctx = this.ctx, x = Math.round(r.x), y = Math.round(r.y), sheet = this.sheets[r.index % Math.max(1, this.sheets.length)];
+    var fr = sheet && sheet.frames[poseFor(r).name], top = y - (fr ? fr.h : 38);
     var name = r.name || ("ROBOT " + (r.index + 1)), nw = textWidth(name);
     plate(ctx, name, Math.max(2, Math.min(W - nw - 4, x - nw / 2)), top - 10, C.w, r.busy ? C.blue : C.plate);
     var text = r.busy ? ((r.step && r.step.kind) ? r.step.kind : "WORKING") : (r.moving ? "" : "AVAILABLE");
@@ -329,10 +397,13 @@ window.Openspace = (function () {
   };
 
   Scene.prototype.renderDom = function () {
+    var self = this;
     if (this.teamEl) {
       this.teamEl.innerHTML = this.robots.map(function (r, i) {
         var s = r.busy ? esc(r.scenario || "") + (r.step ? " · " + esc(r.step.kind) + (r.step.label ? " · " + esc(r.step.label) : "") : "") + " · " + r.items + " item(s)" + (r.runId ? ' · <a href="/runs/' + r.runId + '">run #' + r.runId + "</a>" : "") : "available";
-        return '<div class="member ' + (r.busy ? "busy" : "free") + '"><div class="avatar" style="--tie:' + TIES[i % TIES.length] + '"><i></i></div><div><b>' + esc(r.name) + "</b><div class=\"muted\">" + s + "</div></div></div>";
+        var portrait = (self.config.avatars || [])[i % 3];
+        var avatar = portrait ? '<img src="' + esc(portrait) + '" alt="">' : "<i></i>";
+        return '<div class="member ' + (r.busy ? "busy" : "free") + '"><div class="avatar" style="--tie:' + TIES[i % TIES.length] + '">' + avatar + '</div><div><b>' + esc(r.name) + "</b><div class=\"muted\">" + s + "</div></div></div>";
       }).join("");
     }
     if (this.queueEl) {
