@@ -1,0 +1,23 @@
+{
+  "andromede": {
+    "sheet": "sheet-andromede.png",
+    "w": 21,
+    "h": 38,
+    "legs": 27,
+    "chin": 17
+  },
+  "orion": {
+    "sheet": "sheet-orion.png",
+    "w": 17,
+    "h": 38,
+    "legs": 27,
+    "chin": 17
+  },
+  "sirius": {
+    "sheet": "sheet-sirius.png",
+    "w": 17,
+    "h": 38,
+    "legs": 27,
+    "chin": 17
+  }
+}

@@ -88,25 +88,35 @@ class Platform:
             seed(self.db, self.registry, team_size=self.team.size)
 
     def openspace_config(self) -> dict:
-        """Generated scene per theme and the character sprites, read from static/openspace/."""
+        """The rooms (one per theme, with their scene description) and the character sheets, from static/openspace/."""
         folder = HERE / "static" / "openspace"
+        base = "/static/openspace/"
+        log = logging.getLogger("pulsar")
         config: dict = {"light": None, "dark": None, "characters": []}
         for theme in ("light", "dark"):
-            for ext in ("png", "webp", "jpg"):
-                image = folder / f"background-{theme}.{ext}"
-                if image.exists():
-                    entry = {"background": f"/static/openspace/{image.name}", "anchors": {}, "bg": None}
-                    anchors = folder / f"anchors-{theme}.json"
-                    if anchors.exists():
-                        try:
-                            entry.update(json.loads(anchors.read_text(encoding="utf-8")))
-                        except ValueError:
-                            logging.getLogger("pulsar").warning("%s is not valid JSON; ignoring it", anchors.name)
-                    config[theme] = entry
-                    break
-        for name in ("andromede", "orion", "sirius"):
-            sprite = folder / f"char-{name}.png"
-            config["characters"].append(f"/static/openspace/{sprite.name}" if sprite.exists() else None)
+            image, scene_file = folder / f"background-{theme}.png", folder / f"scene-{theme}.json"
+            if not (image.exists() and scene_file.exists()):
+                continue
+            try:
+                scene = json.loads(scene_file.read_text(encoding="utf-8"))
+            except ValueError:
+                log.warning("%s is not valid JSON; the %s room is disabled", scene_file.name, theme)
+                continue
+            for occ in scene.get("occluders", []):
+                if occ.get("image"):
+                    occ["image"] = base + occ["image"]
+            config[theme] = {"background": base + image.name, "scene": scene}
+        chars_file = folder / "chars.json"
+        if chars_file.exists():
+            try:
+                chars = json.loads(chars_file.read_text(encoding="utf-8"))
+            except ValueError:
+                chars = {}
+                log.warning("chars.json is not valid JSON; the characters are disabled")
+            for name in ("andromede", "orion", "sirius"):
+                meta = chars.get(name)
+                if meta and (folder / meta["sheet"]).exists():
+                    config["characters"].append({"sheet": base + meta["sheet"], "w": meta["w"], "h": meta["h"], "legs": meta["legs"]})
         return config
 
     def start(self) -> None:
