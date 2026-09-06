@@ -201,12 +201,11 @@ table.t td.actions form{display:inline}
 .term .step .msg{color:var(--term-step)}
 .term .trace .msg{color:var(--term-muted)}
 /* open space */
-.atelier-panel{padding:0;overflow:hidden}
-.atelier-wrap{background:#DCE3ED;padding:0;line-height:0}
-.atelier-wrap canvas{width:100%;height:auto;display:block;image-rendering:pixelated;image-rendering:crisp-edges;margin:0 auto;cursor:pointer}
-.atelier-status{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;font-size:.82rem}
-.atelier-status div{padding:8px 14px;border-top:1px solid var(--line-2);display:flex;justify-content:space-between;gap:8px}
-.atelier-status b{font-weight:600}
+.openspace-panel{padding:0;overflow:hidden}
+.openspace-wrap{background:#0B1418;padding:0;line-height:0}
+.openspace-wrap canvas{width:100%;height:auto;display:block;image-rendering:pixelated;image-rendering:crisp-edges;margin:0 auto}
+.openspace-foot{padding:12px 14px;display:grid;gap:10px}
+.openspace-foot .team{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 @media (max-width:900px){
   .page{padding:18px 16px 48px}
   .topbar{gap:14px;padding:0 16px}.topbar .clock{display:none}.topbar .brand .dept{display:none}

@@ -4,10 +4,28 @@
 {% block content %}
 <div class="page-head">
   <div><h1>Robot activity</h1>
-  <p class="sub">{{ d.busy }} of {{ d.team | length }} robots busy · {{ d.scenarios_enabled }} of {{ d.scenarios | length }} scenarios enabled · refreshes every 30 s</p></div>
-  <a class="btn" href="/openspace">Open the open space</a>
+  <p class="sub">{{ d.busy }} of {{ d.team | length }} robots busy · {{ d.scenarios_enabled }} of {{ d.scenarios | length }} scenarios enabled · live view refreshes every 2 s, figures every 30 s</p></div>
+  <div class="legend"><span><i class="sw" style="background:var(--running)"></i>Working</span><span><i class="sw success"></i>Success</span><span><i class="sw warning"></i>With warnings</span><span><i class="sw error"></i>Failed</span></div>
 </div>
 {% if d.load_errors %}<div class="flash err"><b>Scenario files with errors:</b>{% for file, msg in d.load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}</div>{% endif %}
+
+<section class="panel openspace-panel">
+  <div class="openspace-wrap"><canvas id="openspace" aria-label="The open space: the team at work"></canvas></div>
+  <div class="openspace-foot">
+    <div class="team" id="team">
+      {% for w in d.team %}
+      <div class="member {{ 'busy' if w.busy else 'free' }}">
+        <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})"><i></i></div>
+        <div><b>{{ w.name }}</b>
+          {% if w.busy %}<div class="muted">{{ w.scenario_name }}{% if w.step %} · {{ w.step.kind }}{% if w.step.label %} · {{ w.step.label }}{% endif %}{% endif %} · {{ w['items'] }} item(s) · <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>
+          {% else %}<div class="muted">available</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div id="queue">{% if d.queued %}<span class="pill queued"><i class="dot"></i>{{ d.queued | length }} queued: {% for q in d.queued %}{{ q.scenario_name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</div>
+  </div>
+</section>
 
 <section class="tiles">
   <div class="tile hero"><div class="k">Runs today</div><div class="v">{{ d.today.runs | n }}</div>
@@ -15,21 +33,6 @@
   <div class="tile"><div class="k">Success rate · 7 days</div><div class="v">{% if d.week.rate is none %}—{% else %}{{ d.week.rate }} %{% endif %}</div><div class="d">{{ d.week.runs | n }} runs · {{ d.week.errors }} failure(s)</div></div>
   <div class="tile"><div class="k">Average duration · 7 days</div><div class="v">{{ d.week.avg_ms | ms }}</div><div class="d">per finished run</div></div>
   <div class="tile"><div class="k">Items processed · 7 days</div><div class="v">{{ d.week['items'] | n }}</div><div class="d">{{ d.today['items'] | n }} today</div></div>
-</section>
-
-<section class="panel">
-  <div class="panel-head"><h2>The team</h2>{% if d.queued %}<span class="pill queued"><i class="dot"></i>{{ d.queued | length }} queued</span>{% endif %}</div>
-  <div class="team">
-    {% for w in d.team %}
-    <div class="member {{ 'busy' if w.busy else 'free' }}">
-      <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})"><i></i></div>
-      <div><b>{{ w.name }}</b>
-        {% if w.busy %}<div class="muted">{{ w.scenario_name }}{% if w.step %} · {{ w.step.kind }}{% if w.step.label %} · {{ w.step.label }}{% endif %}{% endif %}</div><div class="muted">{{ w['items'] }} item(s){% if w.errors %} · {{ w.errors }} failed{% endif %} · <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>
-        {% else %}<div class="muted">available</div>{% endif %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
 </section>
 
 <section class="panel">
@@ -82,4 +85,15 @@
   </section>
 </div>
 {% endblock %}
-{% block scripts %}<script>setTimeout(function () { if (!document.hidden) location.reload(); }, 30000);</script>{% endblock %}
+{% block scripts %}
+<script src="/static/openspace.js"></script>
+<script>
+  Openspace.start({
+    canvas: document.getElementById("openspace"), team: document.getElementById("team"), queue: document.getElementById("queue"),
+    config: {{ openspace_config | tojson }},
+    poll: function () { return fetch("/api/live", {cache: "no-store"}).then(function (r) { return r.json(); }); },
+    interval: 2000
+  });
+  setTimeout(function () { if (!document.hidden) location.reload(); }, 30000);
+</script>
+{% endblock %}

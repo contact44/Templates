@@ -140,10 +140,12 @@ def test_http_pages_deposit_and_settings(settings):
     app = create_app(settings, start_scheduler=False)
     with TestClient(app) as client:
         assert client.get("/health").json()["team"] == ["Andromede", "Orion", "Sirius"]
-        for path in ("/", "/scenarios", "/scenarios/new", "/scenarios/ok_bot", "/openspace", "/settings", "/runs", "/api/live", "/api/dashboard"):
+        for path in ("/", "/scenarios", "/scenarios/new", "/scenarios/ok_bot", "/settings", "/runs", "/api/live", "/api/dashboard"):
             assert client.get(path).status_code == 200, path
         assert client.get("/scenarios/nope").status_code == 404
-        assert "Samsung Pulsar" in client.get("/").text
+        home = client.get("/").text
+        assert "Samsung Pulsar" in home and 'id="openspace"' in home and "Openspace.start" in home
+        assert client.get("/openspace", follow_redirects=False).status_code == 307
 
         # deposit: check, then save, then a second version, then restore
         r = client.post("/scenarios/deposit", data={"code": DEPOSIT, "action": "check"})
