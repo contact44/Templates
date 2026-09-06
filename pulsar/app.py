@@ -88,19 +88,25 @@ class Platform:
             seed(self.db, self.registry, team_size=self.team.size)
 
     def openspace_config(self) -> dict:
-        """Background image and anchors for the open space, when a generated scene has been dropped in static/openspace/."""
+        """Generated scene per theme and the character sprites, read from static/openspace/."""
         folder = HERE / "static" / "openspace"
-        config: dict = {"background": None, "anchors": {}}
-        for name in ("background.png", "background.webp", "background.jpg"):
-            if (folder / name).exists():
-                config["background"] = f"/static/openspace/{name}"
-                break
-        anchors = folder / "anchors.json"
-        if config["background"] and anchors.exists():
-            try:
-                config.update(json.loads(anchors.read_text(encoding="utf-8")))
-            except ValueError:
-                logging.getLogger("pulsar").warning("anchors.json is not valid JSON; ignoring it")
+        config: dict = {"light": None, "dark": None, "characters": []}
+        for theme in ("light", "dark"):
+            for ext in ("png", "webp", "jpg"):
+                image = folder / f"background-{theme}.{ext}"
+                if image.exists():
+                    entry = {"background": f"/static/openspace/{image.name}", "anchors": {}, "bg": None}
+                    anchors = folder / f"anchors-{theme}.json"
+                    if anchors.exists():
+                        try:
+                            entry.update(json.loads(anchors.read_text(encoding="utf-8")))
+                        except ValueError:
+                            logging.getLogger("pulsar").warning("%s is not valid JSON; ignoring it", anchors.name)
+                    config[theme] = entry
+                    break
+        for name in ("andromede", "orion", "sirius"):
+            sprite = folder / f"char-{name}.png"
+            config["characters"].append(f"/static/openspace/{sprite.name}" if sprite.exists() else None)
         return config
 
     def start(self) -> None:

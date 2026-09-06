@@ -298,7 +298,11 @@ window.Openspace = (function () {
     this.teamEl = opts.team;
     this.queueEl = opts.queue;
     this.config = opts.config || {};
+    this.assets = { light: null, dark: null };
+    this.sprites = [];
+    this.theme = detectTheme();
     this.image = null;
+    this.CH = 60; // character height in logical pixels when drawn from an image
     this.frame = 0;
     this.lastTick = 0;
     this.robots = [];      // {index, name, look, i, j, ti, tj, pose, face, station, busy, scenario, step, fresh, freshUntil}
@@ -309,15 +313,43 @@ window.Openspace = (function () {
     this.error = null;
     this.particles = [];
     this.W = ROOM.W; this.H = ROOM.H;
-    if (this.config.background) this.loadImage(this.config.background);
+    var self = this;
+    ["light", "dark"].forEach(function (t) { var a = self.config[t]; if (a && a.background) { var img = new Image(); img.onload = function () { self.assets[t] = img; self.applyTheme(); }; img.src = a.background; } });
+    (this.config.characters || []).forEach(function (src, i) { var img = new Image(); img.onload = function () { self.sprites[i] = img; }; img.src = src; });
     this.canvas.width = this.W * SCALE; this.canvas.height = this.H * SCALE;
     this.canvas.style.maxWidth = (this.W * SCALE) + "px";
+    watchTheme(function () { self.theme = detectTheme(); self.applyTheme(); });
+    this.applyTheme();
   }
 
-  Scene.prototype.loadImage = function (src) {
-    var self = this, img = new Image();
-    img.onload = function () { self.image = img; var ratio = img.height / img.width; self.H = Math.round(self.W * ratio); self.canvas.height = self.H * SCALE; };
-    img.src = src;
+  function detectTheme() {
+    var forced = document.documentElement.getAttribute("data-theme");
+    if (forced === "dark" || forced === "light") return forced;
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  function watchTheme(cb) {
+    if (window.matchMedia) { var mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", cb); else if (mq.addListener) mq.addListener(cb); }
+    if (window.MutationObserver) new MutationObserver(cb).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+
+  Scene.prototype.current = function () {
+    var a = this.config[this.theme], b = this.config[this.theme === "dark" ? "light" : "dark"];
+    if (a && a.background && this.assets[this.theme]) return { theme: this.theme, cfg: a, img: this.assets[this.theme] };
+    var other = this.theme === "dark" ? "light" : "dark";
+    if (b && b.background && this.assets[other]) return { theme: other, cfg: b, img: this.assets[other] };
+    return null;
+  };
+
+  Scene.prototype.applyTheme = function () {
+    var cur = this.current(), self = this;
+    this.image = cur ? cur.img : null;
+    this.anchors = cur ? (cur.cfg.anchors || {}) : null;
+    var wrap = this.canvas.parentElement;
+    if (wrap) wrap.style.background = cur && cur.cfg.bg ? cur.cfg.bg : "#0B1418";
+    var H = this.image ? Math.round(this.W * this.image.height / this.image.width) : ROOM.H;
+    if (H !== this.H) { this.H = H; this.canvas.height = H * SCALE; }
+    // re-place every robot on the new layout
+    this.robots.forEach(function (r) { var s = self.standAt(r.station, r); r.x = r.tx = s.x; r.y = r.ty = s.y; r.face = s.face; });
   };
 
   Scene.prototype.stationFor = function (robot) {
@@ -326,8 +358,8 @@ window.Openspace = (function () {
     return (kind && KIND_STATION[kind]) || ("desk" + robot.index);
   };
   Scene.prototype.standAt = function (id, robot) {
-    if (this.image && this.config.anchors && this.config.anchors[id]) {
-      var a = this.config.anchors[id];
+    if (this.image && this.anchors && this.anchors[id]) {
+      var a = this.anchors[id];
       return { x: Math.round(a.x * this.W), y: Math.round(a.y * this.H), face: a.face || 1 };
     }
     var st = STATIONS[id] || STATIONS["desk" + (robot.index % 3)];
@@ -363,8 +395,8 @@ window.Openspace = (function () {
     this.renderDom();
   };
 
-  Scene.prototype.spawnPaper = function (r) { this.particles.push({ type: "paper", x: r.x + 4, y: r.y - 12, vx: 1.4 + Math.random() * 0.6, vy: -1.3, life: 12, t: 0 }); };
-  Scene.prototype.spawnSmoke = function (r, n) { for (var k = 0; k < (n || 1); k++) this.particles.push({ type: "smoke", x: r.x - 2 + Math.random() * 6, y: r.y - 18, vx: (Math.random() - 0.5) * 0.4, vy: -0.5 - Math.random() * 0.4, life: 18 + Math.random() * 10, t: 0 }); };
+  Scene.prototype.spawnPaper = function (r) { var top = this.image ? this.CH : 19; this.particles.push({ type: "paper", x: r.x + 4, y: r.y - Math.round(top * 0.55), vx: 1.4 + Math.random() * 0.6, vy: -1.3, life: 12, t: 0 }); };
+  Scene.prototype.spawnSmoke = function (r, n) { var top = this.image ? this.CH : 19; for (var k = 0; k < (n || 1); k++) this.particles.push({ type: "smoke", x: r.x - 2 + Math.random() * 6, y: r.y - top + 2, vx: (Math.random() - 0.5) * 0.4, vy: -0.5 - Math.random() * 0.4, life: 18 + Math.random() * 10, t: 0 }); };
 
   Scene.prototype.tick = function () {
     this.frame++;
@@ -410,7 +442,7 @@ window.Openspace = (function () {
     Object.keys(STATIONS).forEach(function (id) {
       var st = STATIONS[id]; if (!st.label) return;
       var pos;
-      if (self.image) { if (!self.config.anchors || !self.config.anchors[id]) return; var a = self.config.anchors[id]; pos = { x: Math.round(a.x * self.W), y: Math.round(a.y * self.H) + 4 }; }
+      if (self.image) { if (!self.anchors || !self.anchors[id]) return; var a = self.anchors[id]; pos = a.lx != null ? { x: Math.round(a.lx * self.W), y: Math.round(a.ly * self.H) - 2 } : { x: Math.round(a.x * self.W), y: Math.round(a.y * self.H) + 4 }; }
       else { var p = iso(st.i + st.w / 2, st.j + st.d); pos = { x: p.x, y: p.y + 3 }; if (st.kind === "screen") { var q = iso(st.i + st.w / 2, 0); pos = { x: q.x, y: q.y - 6 }; } }
       var w = textWidth(st.label); plate(ctx, st.label, pos.x - w / 2, pos.y, C.w, C.blue);
     });
@@ -432,19 +464,33 @@ window.Openspace = (function () {
   Scene.prototype.drawRobot = function (r) {
     var ctx = this.ctx, f = this.frame;
     var flip = r.face < 0;
-    drawCharacter(ctx, Math.round(r.x), Math.round(r.y), r, r.pose, f, flip);
+    var sprite = this.image ? this.sprites[r.index % 3] : null;
+    if (!sprite) { drawCharacter(ctx, Math.round(r.x), Math.round(r.y), r, r.pose, f, flip); return; }
+    var h = this.CH, w = Math.round(sprite.width * h / sprite.height), x = Math.round(r.x), y = Math.round(r.y);
+    var bob = r.pose === "walk" ? (f % 2 ? -2 : 0) : (r.pose === "type" ? (f % 4 < 2 ? 0 : -1) : 0);
+    ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(x - Math.round(w * 0.3), y - 2, Math.round(w * 0.6), 3);
+    ctx.save();
+    if (flip) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
+    ctx.drawImage(sprite, x - Math.round(w / 2), y - h + bob, w, h);
+    ctx.restore();
+    var hx = x + (flip ? -Math.round(w * 0.32) : Math.round(w * 0.32)), hy = y - Math.round(h * 0.42);
+    if (r.pose === "read") { ctx.fillStyle = C.paper; ctx.fillRect(x - 5, hy - 2 + (f % 2), 10, 12); ctx.fillStyle = C.muted; ctx.fillRect(x - 3, hy + 1, 6, 1); ctx.fillRect(x - 3, hy + 4, 6, 1); ctx.fillRect(x - 3, hy + 7, 4, 1); }
+    else if (r.pose === "coffee") { ctx.fillStyle = C.cup; ctx.fillRect(hx - 2, hy - (f % 4 === 0 ? 1 : 0), 5, 5); if (f % 8 < 4) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(hx, hy - 4, 1, 3); } }
+    else if (r.pose === "type" && f % 2) { ctx.fillStyle = C.neon; ctx.fillRect(x - 6 + (f % 3), y - 8, 2, 1); }
+    else if (r.pose === "wait" && f % 12 < 6) { drawSprite(ctx, ICONS.question, x + Math.round(w / 2) + 2, y - h - 2, { "#": C.amber }); }
   };
 
   Scene.prototype.drawRobotPlates = function (r) {
     var ctx = this.ctx;
     // name plate under the feet, action plate above the head
     var name = r.name || ("ROBOT " + (r.index + 1));
-    plate(ctx, name, Math.round(r.x) - textWidth(name) / 2, Math.round(r.y) + (r.station.indexOf("desk") === 0 ? 12 : 3), C.w, r.busy ? C.blue : C.plate);
+    plate(ctx, name, Math.round(r.x) - textWidth(name) / 2, Math.round(r.y) + (!this.image && r.station.indexOf("desk") === 0 ? 12 : 3), C.w, r.busy ? C.blue : C.plate);
     var text = r.busy ? ((r.step && r.step.kind) ? r.step.kind : "WORKING") : (r.pose === "walk" ? "..." : "AVAILABLE");
     if (r.busy && r.items) text += " " + r.items;
     var w = textWidth(text);
-    plate(ctx, text, Math.max(2, Math.min(this.W - w - 4, Math.round(r.x) - w / 2)), Math.round(r.y) - 28, r.busy ? C.neon : C.muted, "rgba(11,18,32,.92)");
-    if (r.fresh && r.freshUntil > Date.now() && ICONS[r.fresh]) { drawSprite(ctx, BUBBLE, Math.round(r.x) + 6, Math.round(r.y) - 42, { k: C.k, w: C.w }); drawSprite(ctx, ICONS[r.fresh], Math.round(r.x) + 10, Math.round(r.y) - 40, { g: C.green, a: C.amber, r: C.red }); }
+    var top = this.image && this.sprites[r.index % 3] ? this.CH : 19;
+    plate(ctx, text, Math.max(2, Math.min(this.W - w - 4, Math.round(r.x) - w / 2)), Math.round(r.y) - top - 9, r.busy ? C.neon : C.muted, "rgba(11,18,32,.92)");
+    if (r.fresh && r.freshUntil > Date.now() && ICONS[r.fresh]) { drawSprite(ctx, BUBBLE, Math.round(r.x) + 8, Math.round(r.y) - top - 24, { k: C.k, w: C.w }); drawSprite(ctx, ICONS[r.fresh], Math.round(r.x) + 12, Math.round(r.y) - top - 22, { g: C.green, a: C.amber, r: C.red }); }
   };
 
   Scene.prototype.renderDom = function () {

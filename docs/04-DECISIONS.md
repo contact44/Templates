@@ -2,6 +2,7 @@
 
 | Date | Decision |
 |---|---|
+| 2026-09-06 | Open space artwork: the Higgsfield-generated rooms are the reference — **light room for the light theme, dark room for the dark theme** — with the generated character sheet for Andromede, Orion and Sirius. The room drawn in code stays only as a fallback when the images are missing. Samsung logo on the wall (proposal E): pending validation. |
 | 2026-09-06 | Platform name: **Samsung Pulsar** (display name; package and CLI: `pulsar`). |
 | 2026-09-06 | First three robots: **Andromede, Orion, Sirius** (editable under Settings > The team). |
 | 2026-09-06 | Interface language: **English**. Scenario contract and action catalogue in English (`mail.read`, `web.browse`, `verify`…). |
