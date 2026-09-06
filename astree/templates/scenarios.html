@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill %}
+{% block title %}Scénarios · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Scénarios</h1><p class="sub">Un scénario est un fichier Python. Ceux livrés avec le code sont dans <span class="mono">{{ builtin_dir }}</span>, ceux que vous déposez dans <span class="mono">{{ deposited_dir }}</span>.</p></div>
+  <div class="actions-row"><form method="post" action="/scenarios/recharger"><button class="btn" type="submit">Recharger</button></form><a class="btn primary" href="/scenarios/nouveau">Déposer un scénario</a></div>
+</div>
+{% if load_errors %}<div class="flash err"><b>Fichiers en erreur :</b>{% for file, msg in load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}</div>{% endif %}
+<section class="panel">
+<div class="tw"><table class="t">
+  <thead><tr><th>Scénario</th><th>Origine</th><th>Planification</th><th>Prochain passage</th><th>Dernier passage</th><th>État</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="{{ '' if r.enabled else 'off' }}">
+    <td><a href="/scenarios/{{ r.spec.key }}"><b>{{ r.spec.name }}</b></a><div class="muted small">{{ r.spec.description }}</div></td>
+    <td class="small">{{ r.spec.source | source_label }}{% if r.version %} · v{{ r.version }}{% endif %}</td>
+    <td>{% if not r.enabled %}<span class="pill none"><i class="dot"></i>Désactivé</span>{% elif r.schedule %}<span class="mono">{{ r.schedule }}</span>{% else %}À la demande{% endif %}</td>
+    <td>{{ r.next_run | dt if r.next_run else '—' }}</td>
+    <td>{{ r.last.started_at | dt if r.last else '—' }}</td>
+    <td>{% if r.active %}{{ pill(r.active.status) }}{% else %}{{ pill(r.last.status if r.last else none) }}{% endif %}</td>
+    <td class="actions"><form method="post" action="/scenarios/{{ r.spec.key }}/run"><button class="btn small" type="submit" {% if r.active %}disabled{% endif %}>Lancer</button></form></td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="empty">Aucun scénario chargé.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+</section>
+{% endblock %}

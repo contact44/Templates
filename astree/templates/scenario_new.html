@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Déposer un scénario · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumb"><a href="/scenarios">Scénarios</a> / nouveau</div><h1>{% if replacing %}Nouvelle version de « {{ replacing }} »{% else %}Déposer un scénario{% endif %}</h1>
+  <p class="sub">Collez le code ou déposez un fichier <span class="mono">.py</span>. « Vérifier » lance les contrôles sans rien enregistrer ; « Enregistrer » crée une version et charge le scénario.</p></div>
+</div>
+<form method="post" action="/scenarios/deposer" enctype="multipart/form-data" class="deposit">
+  <input type="hidden" name="replacing" value="{{ replacing }}">
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-head"><h2>Code</h2><label class="btn small file-btn">Choisir un fichier .py<input type="file" name="file" accept=".py,text/x-python" onchange="this.form.action.value='check';this.form.submit()"></label></div>
+      <textarea name="code" class="code-editor" rows="24" spellcheck="false" placeholder='KEY = "mon_scenario"
+NAME = "Mon scénario"
+SCHEDULE = "0 7 28 * *"
+
+def run(ctx):
+    with ctx.step("web.consulter", "SELMS+"):
+        ...'>{{ code }}</textarea>
+      <label class="note-field">Note de version <input type="text" name="note" value="{{ note }}" placeholder="ex. ajout du contrôle des doublons"></label>
+      <div class="actions-row"><button class="btn" type="submit" name="action" value="check">Vérifier</button><button class="btn primary" type="submit" name="action" value="save" {% if inspection and not inspection.valid %}disabled{% endif %}>Enregistrer la version</button></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Contrôles</h2>{% if inspection %}<span class="pill {{ 'success' if inspection.valid else 'error' }}"><i class="dot"></i>{{ 'prêt à enregistrer' if inspection.valid else 'à corriger' }}</span>{% endif %}</div>
+      {% if not inspection %}
+      <p class="muted">Les contrôles s'affichent ici : syntaxe, contrat (KEY, NAME, run), disponibilité de la clé, planification, actions déclarées, accès réseau, envois sortants, identifiants du coffre.</p>
+      {% else %}
+      <ul class="checks">{% for c in inspection.checks %}<li class="{{ c.level }}"><i></i>{{ c.text }}</li>{% endfor %}</ul>
+      {% if inspection.key %}<dl class="facts compact"><div><dt>Clé</dt><dd class="mono">{{ inspection.key }}</dd></div><div><dt>Nom</dt><dd>{{ inspection.name }}</dd></div><div><dt>Planification</dt><dd>{{ inspection.schedule or 'à la demande' }}</dd></div>{% if inspection.imports %}<div><dt>Imports</dt><dd class="mono">{{ inspection.imports | join(', ') }}</dd></div>{% endif %}</dl>{% endif %}
+      {% endif %}
+      <h3>Rappel du contrat</h3>
+      <pre class="contract">KEY = "cle_unique"            # lettres, chiffres, _ -
+NAME = "Nom affiché"
+DESCRIPTION = "Une phrase."
+SCHEDULE = "0 7 28 * *"        # cron local, ou None
+ENABLED_BY_DEFAULT = True      # optionnel
+PARAMS = [{"name": "dossier", "label": "Dossier", "type": "str", "default": "inbox"}]
+
+def run(ctx):
+    cred = ctx.credentials("selms")          # coffre : cred.username, cred.password
+    with ctx.step("web.consulter", "SELMS+"):  # actions : {{ action_kinds | join(', ') }}
+        ...
+    for f in ctx.step("doc.lire", "Factures", fichiers):
+        ctx.item_done()                      # ou ctx.item_failed("motif")
+    ctx.metric("lignes", 142)
+    chemin = ctx.output_path("export.xlsx")  # workspace/sorties/&lt;clé&gt;/</pre>
+    </section>
+  </div>
+</form>
+{% endblock %}

@@ -7,10 +7,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-os.environ.setdefault("GREFFIER_DEMO", "1")
-os.environ.setdefault("GREFFIER_WORKSPACE", "/tmp/greffier")
-os.environ.setdefault("GREFFIER_ROBOTS", str(ROOT / "robots"))
+os.environ.setdefault("ASTREE_DEMO", "1")
+os.environ.setdefault("ASTREE_WORKSPACE", "/tmp/astree")
+os.environ.setdefault("ASTREE_SCENARIOS", str(ROOT / "scenarios"))
 
-from greffier.app import create_app  # noqa: E402
+from astree.app import create_app  # noqa: E402
 
 app = create_app()

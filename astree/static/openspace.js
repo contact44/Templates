@@ -1,17 +1,17 @@
-/* Greffier · L'atelier — pixel-art live view of the robots. No dependencies, no assets: every sprite is drawn from strings. */
+/* Astrée · open space — pixel-art live view of the scenarios and the team. No dependencies, no assets: every sprite is drawn from strings. */
 window.Atelier = (function () {
   "use strict";
 
   // ---- palette -------------------------------------------------------------------------------------------------
   var C = {
-    k: "#1b201e", w: "#f4f6f3", y: "#f2d24a", r: "#e0503f", g: "#3fbf7a", a: "#e0a93f", c: "#6fd8ea", s: "#7a827d",
-    t: "#4a86d8", n: "#8a6a4a", m: "#5e4632", p: "#e8e2c8", q: "#2b3532", f1: "#2f4a44", f2: "#2a423d", wall: "#3a5651",
-    wall2: "#325047", board: "#213632", tray: "#4b5a57", screen: "#0f1a18"
+    k: "#0B1220", w: "#FFFFFF", y: "#F2C94C", r: "#C62828", g: "#1E8E5A", a: "#B8730F", c: "#1428A0", eye: "#6FD8EA", s: "#7D8797",
+    t: "#1428A0", n: "#A37C55", m: "#7A5A3C", p: "#FFFFFF", ink: "#0B1220", q: "#1428A0", f1: "#E4EAF2", f2: "#DCE3ED", wall: "#F4F7FB",
+    wall2: "#E6ECF5", board: "#1428A0", tray: "#5C6675", screen: "#0B1220"
   };
   var BODIES = [["#3aa6a0", "#237a75"], ["#e08a3c", "#a6612a"], ["#8b6fd6", "#5f47a3"], ["#4a86d8", "#2f5f9e"],
     ["#d86aa0", "#a34a76"], ["#8ab83c", "#5f822a"], ["#d6b34a", "#9c7f2c"], ["#5fb9d6", "#3a7f95"]];
   var OFF_BODY = ["#6f7774", "#4f5654"];
-  var STATUS_COLOR = { success: C.g, warning: C.a, error: C.r, running: C.t, off: C.s, idle: C.c };
+  var STATUS_COLOR = { success: C.g, warning: C.a, error: C.r, running: C.t, off: C.s, idle: C.eye };
 
   // ---- sprites (one char per pixel, "." = transparent) ---------------------------------------------------------
   var ROBOT = [
@@ -171,14 +171,15 @@ window.Atelier = (function () {
     this.demo = !!data.demo;
     this.events = data.events || [];
     var self = this;
-    (data.robots || []).forEach(function (r, i) {
+    (data.scenarios || []).forEach(function (r, i) {
       var s = self.seen[r.key] || (self.seen[r.key] = { items: 0, running: false, lastId: r.last ? r.last.id : null, freshUntil: 0, freshStatus: null, first: true });
       var running = r.state === "running";
       if (running && r.items > s.items) {
         for (var k = 0; k < Math.min(4, r.items - s.items); k++) self.spawnPaper(i);
       }
       if (running && r.errors > (s.errors || 0)) self.spawnSpark(i);
-      var finished = (!running && s.running) || (r.last && s.lastId !== r.last.id && !running);
+      var queued = r.state === "queued";
+      var finished = (!running && !queued && s.running) || (r.last && s.lastId !== r.last.id && !running && !queued);
       if (finished && r.last) {
         s.freshUntil = now + BUBBLE_MS;
         s.freshStatus = r.last.status;
@@ -193,7 +194,7 @@ window.Atelier = (function () {
       s.lastId = r.last ? r.last.id : null;
       s.first = false;
     });
-    this.robots = data.robots || [];
+    this.robots = data.scenarios || [];
     this.resize();
     this.renderDom();
   };
@@ -237,17 +238,17 @@ window.Atelier = (function () {
     // wall, skirting, sign, clock
     ctx.fillStyle = C.wall; ctx.fillRect(0, 0, l.w, WALL_H);
     ctx.fillStyle = C.wall2; for (var wx = 0; wx < l.w; wx += 16) ctx.fillRect(wx + ((Math.floor(wx / 16) % 2) * 8), 8, 8, 4);
+    ctx.fillStyle = "#BFD4F5"; ctx.fillRect(Math.round(l.w / 2) - 30, 5, 60, 18); ctx.fillStyle = C.w; ctx.fillRect(Math.round(l.w / 2) - 1, 5, 2, 18); ctx.fillRect(Math.round(l.w / 2) - 30, 13, 60, 2);
     ctx.fillStyle = C.q; ctx.fillRect(0, WALL_H - 3, l.w, 3);
     ctx.fillStyle = C.board; ctx.fillRect(8, 6, 74, 18);
-    ctx.fillStyle = C.k; ctx.fillRect(9, 7, 72, 16);
-    drawText(ctx, "GREFFIER", 13, 10, C.y);
-    drawText(ctx, "ATELIER", 13, 16, C.p);
+    drawText(ctx, "ASTREE", 13, 10, C.w);
+    drawText(ctx, "OPEN SPACE", 13, 16, "#BFD4F5");
     var cw = 34, cx = l.w - cw - 8;
     ctx.fillStyle = C.k; ctx.fillRect(cx, 8, cw, 12);
     ctx.fillStyle = C.screen; ctx.fillRect(cx + 1, 9, cw - 2, 10);
     drawText(ctx, this.clock || "--:--", cx + 4, 11, C.c);
-    if (this.demo) drawText(ctx, "DEMO", cx - 22, 11, C.a);
-    if (this.error) drawText(ctx, "HORS LIGNE", cx - 46, 11, C.r);
+    if (this.demo) drawText(ctx, "DEMO", cx - 22, 11, C.ink);
+    if (this.error) drawText(ctx, "HORS LIGNE", cx - 50, 11, C.r);
     // stations
     this.rects = [];
     for (var i = 0; i < this.robots.length; i++) this.renderStation(i);
@@ -255,7 +256,7 @@ window.Atelier = (function () {
     var self = this;
     this.particles.forEach(function (p) {
       if (p.type === "paper") { drawSprite(ctx, PAPER, Math.round(p.x), Math.round(p.y)); }
-      else if (p.type === "smoke") { ctx.fillStyle = "rgba(180,186,182," + (0.7 * (1 - p.t / p.life)).toFixed(2) + ")"; var r = 2 + Math.floor(p.t / 6); ctx.fillRect(Math.round(p.x) - r, Math.round(p.y) - r, r * 2, r * 2); }
+      else if (p.type === "smoke") { ctx.fillStyle = "rgba(90,100,112," + (0.6 * (1 - p.t / p.life)).toFixed(2) + ")"; var r = 2 + Math.floor(p.t / 6); ctx.fillRect(Math.round(p.x) - r, Math.round(p.y) - r, r * 2, r * 2); }
       else { ctx.fillStyle = C.y; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
     });
   };
@@ -266,11 +267,11 @@ window.Atelier = (function () {
     var body = off ? OFF_BODY : BODIES[i % BODIES.length];
     var fresh = s.freshUntil > Date.now() ? s.freshStatus : null;
     var lastStatus = r.last ? r.last.status : null;
-    var eye = off ? C.k : running ? C.c : fresh === "error" ? C.r : fresh === "warning" ? C.a : (f % 28 === 0 ? body[1] : C.c);
+    var eye = off ? C.k : running ? C.eye : fresh === "error" ? C.r : fresh === "warning" ? C.a : (f % 28 === 0 ? body[1] : C.eye);
     var map = { b: body[0], d: body[1], E: eye, s: running ? (f % 2 ? C.y : C.g) : off ? C.k : C.g };
     this.rects.push({ x: p.x, y: p.y, w: STATION_W, h: STATION_H, key: r.key, name: r.name });
     // mat
-    ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.fillRect(p.x + 8, p.y + 65, 76, 3);
+    ctx.fillStyle = "rgba(11,18,32,.12)"; ctx.fillRect(p.x + 8, p.y + 65, 76, 3);
     // robot behind the desk
     var rx = p.x + 24, ry = p.y + 32 + (running ? (f % 4 < 2 ? 0 : 1) : 0);
     drawSprite(ctx, ROBOT, rx, ry, map);
@@ -292,13 +293,14 @@ window.Atelier = (function () {
     // bubble
     if (fresh && ICONS[fresh]) { drawSprite(ctx, BUBBLE, rx + 8, ry - 14); drawSprite(ctx, ICONS[fresh], rx + 12, ry - 12); }
     // nameplate and status
-    ctx.fillStyle = C.k; ctx.fillRect(p.x + 4, p.y + 68, 96, 9);
-    drawText(ctx, r.name, p.x + 7, p.y + 70, C.p, 90);
+    ctx.fillStyle = C.board; ctx.fillRect(p.x + 4, p.y + 68, 96, 9);
+    drawText(ctx, r.name, p.x + 7, p.y + 70, C.w, 90);
     var line, color;
     if (off) { line = "ETEINT"; color = C.s; }
-    else if (running) { line = "AU TRAVAIL " + (r.items || 0) + (r.errors ? " / " + r.errors + " ECHECS" : ""); color = C.c; }
-    else if (!r.last) { line = "JAMAIS LANCE"; color = C.p; }
-    else { line = ({ success: "OK", warning: "RESERVES", error: "ECHEC" }[lastStatus] || lastStatus) + " " + (r.last.items || 0) + " EL."; color = STATUS_COLOR[lastStatus] || C.p; }
+    else if (running) { line = (r.worker ? r.worker.toUpperCase() + " " : "") + (r.step ? r.step.kind.toUpperCase() : "AU TRAVAIL") + " " + (r.items || 0) + (r.errors ? " / " + r.errors + " ECH." : ""); color = C.c; }
+    else if (r.state === "queued") { line = "EN FILE"; color = C.ink; }
+    else if (!r.last) { line = "JAMAIS LANCE"; color = C.ink; }
+    else { line = ({ success: "OK", warning: "RESERVES", error: "ECHEC" }[lastStatus] || lastStatus) + " " + (r.last.items || 0) + " EL."; color = STATUS_COLOR[lastStatus] || C.ink; }
     drawText(ctx, line, p.x + 7, p.y + 80, color, 90);
     if (!off && r.next_run) drawText(ctx, "PROCHAIN " + r.next_run, p.x + 7, p.y + 87, C.s, 90);
     else if (!off) drawText(ctx, "A LA DEMANDE", p.x + 7, p.y + 87, C.s, 90);
@@ -323,7 +325,7 @@ window.Atelier = (function () {
     if (this.status) {
       var self = this;
       this.status.innerHTML = this.robots.map(function (r) {
-        var s = r.state === "running" ? "au travail · " + (r.items || 0) + " élément(s)" : r.state === "off" ? "éteint"
+        var s = r.state === "running" ? (r.worker ? r.worker + " · " : "") + (r.step ? r.step.kind + (r.step.label ? " · " + r.step.label : "") : "au travail") + " · " + (r.items || 0) + " élément(s)" : r.state === "queued" ? "en file d'attente" : r.state === "off" ? "éteint"
           : r.last ? ({ success: "réussi", warning: "avec réserves", error: "échec" }[r.last.status] || r.last.status) + " · " + (r.last.items || 0) + " élément(s)" : "jamais lancé";
         return "<div><b>" + esc(r.name) + "</b><span>" + esc(s) + "</span></div>";
       }).join("");
@@ -331,7 +333,7 @@ window.Atelier = (function () {
     if (this.feed) {
       this.feed.innerHTML = this.events.map(function (e) {
         var label = { success: "Réussi", warning: "Avec réserves", error: "Échec", running: "En cours" }[e.status] || e.status;
-        return '<li><a href="/runs/' + e.id + '"><div class="row"><b>' + esc(e.robot_name) + '</b><span class="pill ' + esc(e.status) + '"><i class="dot"></i>' + label + '</span></div><div class="muted">' + esc(e.started) + ' · ' + esc(e.message || "") + '</div></a></li>';
+        return '<li><a href="/runs/' + e.id + '"><div class="row"><b>' + esc(e.scenario_name) + (e.worker ? ' <span class="muted">· ' + esc(e.worker) + '</span>' : '') + '</b><span class="pill ' + esc(e.status) + '"><i class="dot"></i>' + label + '</span></div><div class="muted">' + esc(e.started) + ' · ' + esc(e.message || "") + '</div></a></li>';
       }).join("") || '<li class="empty">Rien pour le moment.</li>';
     }
   };

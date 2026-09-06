@@ -1,7 +1,8 @@
-# Greffier
+# Astrée
 
-Plate-forme RPA locale : configuration des robots et tableau de bord de performance.
-Tourne sur un seul PC, sans serveur ni cloud. Un processus Python, une base SQLite, un navigateur.
+Plate-forme RPA locale pour une direction juridique : des scénarios Python déposés dans l'interface, une équipe de
+robots nommés qui les exécute en arrière-plan, un open space en 2D pour voir qui travaille sur quoi, et un
+tableau de bord de performance. Un processus Python, une base SQLite, un navigateur. Sans serveur ni cloud.
 
 ## Démarrer
 
@@ -9,61 +10,71 @@ Tourne sur un seul PC, sans serveur ni cloud. Un processus Python, une base SQLi
 python -m venv .venv
 .venv\Scripts\activate          # Windows   (Linux/macOS : source .venv/bin/activate)
 pip install -e .[dev]
-greffier demo-data              # optionnel : 14 jours d'exécutions fictives pour voir le tableau de bord
-greffier                        # http://127.0.0.1:8765
+astree demo-data                # optionnel : 14 jours d'exécutions fictives pour voir le tableau de bord
+astree                          # http://127.0.0.1:8765
 ```
 
-Autres commandes : `greffier list` (robots chargés), `greffier run <key>` (une exécution en ligne de commande),
-`greffier demo-data --reset` (régénère l'historique de démonstration), `greffier -v` (journal détaillé).
+Autres commandes : `astree list` (scénarios chargés), `astree run <clé>` (une exécution sur le terminal),
+`astree demo-data --reset`, `astree -v` (journal détaillé).
 
-Variables d'environnement optionnelles : `GREFFIER_WORKSPACE` (dossier des données, défaut `./workspace`),
-`GREFFIER_ROBOTS` (dossier des robots, défaut `./robots`), `GREFFIER_HOST`, `GREFFIER_PORT`, `GREFFIER_TZ` (défaut `Europe/Paris`).
+Variables d'environnement optionnelles : `ASTREE_WORKSPACE` (données, défaut `./workspace`), `ASTREE_SCENARIOS`
+(scénarios livrés, défaut `./scenarios`), `ASTREE_HOST`, `ASTREE_PORT`, `ASTREE_TZ` (défaut `Europe/Paris`).
 
-## Ce que fait la plate-forme
+## Les onglets
 
-- **Tableau de bord** : exécutions du jour, taux de réussite et durée moyenne sur 7 jours, éléments traités,
-  exécutions par jour sur 14 jours, une carte par robot avec sa tendance, les échecs à regarder, les dernières exécutions.
-- **Configuration** : par robot, activation, planification cron (heure locale) et paramètres déclarés par le robot.
-- **Exécution** : planifiée (dans le même processus) ou manuelle, un seul passage à la fois par robot.
-- **Journal** : chaque exécution garde ses lignes de journal, ses compteurs, ses métriques et son message de fin.
-- **API JSON** : `/api/dashboard`, `/api/robots`, `/health`.
+- **Dashboard** : l'équipe (qui est occupé, sur quoi, à quelle action), exécutions du jour, réussite et durée moyenne
+  sur 7 jours, exécutions par jour sur 14 jours, une carte par scénario, les échecs à regarder.
+- **Scénarios** : liste, dépôt d'un fichier `.py` ou du code collé, contrôles automatiques (syntaxe, contrat, clé,
+  planification, actions déclarées, accès réseau, envois sortants), versions conservées et restaurables,
+  activation, planification cron, paramètres.
+- **Open space** : la vue pixel art en direct, un poste par scénario, le nom du robot qui s'en occupe et l'action
+  en cours. Cliquer un poste lance le scénario.
+- **Paramètres** : noms des robots (le nombre de robots = le nombre de scénarios simultanés), emplacements,
+  identifiants du coffre.
+- **Historique** : toutes les exécutions, filtrables ; chaque exécution a sa frise d'actions et son journal.
 
-## Écrire un robot
+## L'équipe et le coffre
 
-Un robot est un fichier Python dans `robots/`. Le nom du fichier n'a pas d'importance, sauf s'il commence par `_` (ignoré).
+Les robots (Vega, Altaïr, Deneb par défaut) sont des postes d'exécution : un scénario planifié ou lancé à la main
+entre dans une file, le premier robot libre le prend et le mène jusqu'au bout.
+
+Les identifiants (Paramètres › Identifiants) sont des couples utilisateur / mot de passe nommés. Le nom d'utilisateur
+est en base ; le mot de passe va dans le gestionnaire d'identifiants du système (Windows Credential Manager via
+`keyring`), ou à défaut dans un fichier chiffré du workspace. Un scénario y accède avec `ctx.credentials("selms")` ;
+la valeur du mot de passe est masquée dans le journal.
+
+## Écrire un scénario
 
 ```python
-KEY = "mon_robot"                    # identifiant stable, utilisé dans les URL et la base
-NAME = "Mon robot"
-DESCRIPTION = "Ce qu'il fait, en une phrase."
-SCHEDULE = "*/15 8-19 * * 1-5"       # cron par défaut, ou None pour « à la demande »
-PARAMS = [                           # facultatif ; types : str, int, float, bool, text, choice
-    {"name": "dossier", "label": "Dossier à lire", "type": "str", "default": "inbox"},
-    {"name": "mode", "label": "Mode", "type": "choice", "choices": ["rapide", "complet"], "default": "rapide"},
-]
+KEY = "extraction_selms"                 # identifiant stable
+NAME = "Extraction mensuelle SELMS+"
+DESCRIPTION = "Une phrase."
+SCHEDULE = "0 7 28 * *"                  # cron local, ou None pour « à la demande »
+ENABLED_BY_DEFAULT = False               # optionnel
+PARAMS = [{"name": "dossier", "label": "Dossier de dépôt", "type": "str", "default": "sorties/selms"}]
 
 def run(ctx):
-    ctx.info("Démarrage")                    # ctx.info / ctx.warn / ctx.error écrivent dans le journal
-    for element in lire(ctx.workspace / ctx.params["dossier"]):
-        try:
-            traiter(element)
-            ctx.item_done()                  # compteur d'éléments traités
-        except Exception as e:
-            ctx.item_failed(f"{element}: {e}")   # compteur d'échecs ; le passage finit « avec réserves »
-    ctx.metric("taille_lot", 42)             # affiché sur la page de l'exécution
-    chemin = ctx.output_path("rapport.csv")  # workspace/sorties/mon_robot/rapport.csv
+    cred = ctx.credentials("selms")                       # cred.username, cred.password
+    with ctx.step("web.consulter", "SELMS+ · connexion"):  # action déclarée : visible dans l'open space et mesurée
+        ...
+    for fichier in ctx.step("doc.lire", "Exports", fichiers):
+        ctx.item_done()                                    # ou ctx.item_failed("motif") → « avec réserves »
+    ctx.metric("contrats", 142)
+    chemin = ctx.output_path("export.xlsx")                # workspace/sorties/<clé>/
 ```
 
-Une exception non rattrapée met le passage en **échec** et conserve la trace dans le journal.
-Après avoir ajouté ou modifié un fichier, cliquer sur « Recharger les robots » dans la page Robots.
+Actions du catalogue : `mail.lire`, `mail.repondre`, `doc.lire`, `doc.remplir`, `web.consulter`, `verifier`,
+`propose`, `envoyer`, `archiver`, `attendre`. Une exception non rattrapée met l'exécution en échec, avec l'action
+fautive et la trace dans le journal.
 
 ## Arborescence
 
 ```
-greffier/           socle : app.py (routes), db.py, registry.py, runner.py, scheduler.py, stats.py, templates/, static/
-robots/             un fichier par robot (deux robots de démonstration fournis)
-workspace/          données locales, hors git : greffier.db, inbox/, sorties/
-tests/              pytest
+astree/         socle : app.py (routes), db.py, registry.py, runner.py, team.py, scheduler.py, vault.py, stats.py, templates/, static/
+scenarios/      scénarios livrés avec le code (deux démos + le squelette de l'extraction SELMS+)
+workspace/      données locales, hors git : astree.db, scenarios/ déposés et leurs versions, sorties/, coffre
+tests/          pytest
+docs/           cadrage et prévisualisations
 ```
 
 ## Tests

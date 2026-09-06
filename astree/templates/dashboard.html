@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Activité des robots</h1>
+  <p class="sub">{{ d.busy }} robot(s) occupé(s) sur {{ d.team | length }} · {{ d.scenarios_enabled }} scénario(s) actif(s) sur {{ d.scenarios | length }} · actualisation toutes les 30 s</p></div>
+  <a class="btn" href="/openspace">Voir l'open space</a>
+</div>
+{% if d.load_errors %}<div class="flash err"><b>Fichiers de scénario en erreur :</b>{% for file, msg in d.load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}</div>{% endif %}
+
+<section class="tiles">
+  <div class="tile hero"><div class="k">Exécutions aujourd'hui</div><div class="v">{{ d.today.runs | n }}</div>
+    <div class="d"><span class="dot success"></span>{{ d.today.success }} réussies <span class="dot warning"></span>{{ d.today.warning }} avec réserves <span class="dot error"></span>{{ d.today.error }} en échec{% if d.today.running %} · {{ d.today.running }} en cours{% endif %}</div></div>
+  <div class="tile"><div class="k">Taux de réussite · 7 jours</div><div class="v">{% if d.week.rate is none %}—{% else %}{{ d.week.rate }} %{% endif %}</div><div class="d">{{ d.week.runs | n }} exécutions · {{ d.week.errors }} échec(s)</div></div>
+  <div class="tile"><div class="k">Durée moyenne · 7 jours</div><div class="v">{{ d.week.avg_ms | ms }}</div><div class="d">par exécution terminée</div></div>
+  <div class="tile"><div class="k">Éléments traités · 7 jours</div><div class="v">{{ d.week['items'] | n }}</div><div class="d">{{ d.today['items'] | n }} aujourd'hui</div></div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>L'équipe</h2>{% if d.queued %}<span class="pill queued"><i class="dot"></i>{{ d.queued | length }} en file</span>{% endif %}</div>
+  <div class="team">
+    {% for w in d.team %}
+    <div class="member {{ 'busy' if w.busy else 'free' }}">
+      <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})"><i></i></div>
+      <div><b>{{ w.name }}</b>
+        {% if w.busy %}<div class="muted">{{ w.scenario_name }}{% if w.step %} · {{ w.step.kind }}{% if w.step.label %} · {{ w.step.label }}{% endif %}{% endif %}</div><div class="muted">{{ w['items'] }} élément(s){% if w.errors %} · {{ w.errors }} en échec{% endif %} · <a href="/runs/{{ w.run_id }}">exécution #{{ w.run_id }}</a></div>
+        {% else %}<div class="muted">disponible</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>Exécutions par jour</h2>
+    <div class="legend"><span><i class="sw success"></i>Réussi</span><span><i class="sw warning"></i>Avec réserves</span><span><i class="sw error"></i>Échec</span></div></div>
+  <div class="chart-wrap">
+  <svg class="chart" viewBox="0 0 {{ d.days.width }} {{ d.days.height }}" role="img" aria-label="Exécutions par jour sur 14 jours">
+    {% for t in d.days.ticks %}<line class="grid" x1="0" x2="{{ d.days.width }}" y1="{{ t.y }}" y2="{{ t.y }}"></line><text class="tick" x="0" y="{{ t.y - 3 }}">{{ t.value }}</text>{% endfor %}
+    <line class="axis" x1="0" x2="{{ d.days.width }}" y1="{{ d.days.baseline }}" y2="{{ d.days.baseline }}"></line>
+    {% for c in d.days.columns %}
+    <g class="col"><title>{{ c.date.strftime('%d/%m') }} · {{ c.total }} exécution(s) : {{ c.success }} réussies, {{ c.warning }} avec réserves, {{ c.error }} en échec</title>
+      <rect class="hit" x="{{ c.x - 6 }}" y="0" width="{{ c.w + 12 }}" height="{{ d.days.baseline }}"></rect>
+      {% for s in c.segments %}{% if s.path %}<path class="bar {{ s.status }}" d="{{ s.path }}"></path>{% else %}<rect class="bar {{ s.status }}" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}"></rect>{% endif %}{% endfor %}
+      {% if c.show_value %}<text class="val" x="{{ c.cx }}" y="{{ (c.segments | last).y - 4 }}" text-anchor="middle">{{ c.total }}</text>{% endif %}
+      {% if c.label %}<text class="tick" x="{{ c.cx }}" y="{{ d.days.height - 6 }}" text-anchor="middle">{{ c.label }}</text>{% endif %}
+    </g>
+    {% endfor %}
+  </svg></div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>Scénarios</h2><a class="btn small" href="/scenarios">Gérer</a></div>
+  {% if not d.scenarios %}<p class="empty">Aucun scénario chargé. Déposez-en un depuis l'onglet Scénarios.</p>{% endif %}
+  <div class="cards">
+    {% for s in d.scenarios %}
+    <a class="card {{ '' if s.enabled else 'off' }}" href="/scenarios/{{ s.key }}">
+      <div class="card-head"><span class="name">{{ s.name }}</span>{% if s.running %}<span class="pill {{ s.active.status }}"><i class="dot"></i>{{ s.active.status | status_label }}</span>{% else %}{{ pill(s.last_status) }}{% endif %}</div>
+      <div class="card-meta"><span>Dernier passage {{ s.last.started_at | dt if s.last else '—' }}</span>
+        <span>{% if not s.enabled %}Désactivé{% elif s.next_run %}Prochain {{ s.next_run | dt }}{% elif s.schedule %}Planification invalide{% else %}À la demande{% endif %}</span></div>
+      <div class="card-stats"><div><b>{% if s.rate_7d is none %}—{% else %}{{ s.rate_7d }} %{% endif %}</b><span>réussite 7 j</span></div><div><b>{{ s.avg_ms_7d | ms }}</b><span>durée moy.</span></div><div><b>{{ s.items_7d | n }}</b><span>éléments 7 j</span></div></div>
+      <svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">{% if s.spark.points %}<polygon class="area" points="{{ s.spark.area }}"></polygon><polyline class="line" points="{{ s.spark.points }}"></polyline><circle class="end" cx="{{ s.spark.last[0] }}" cy="{{ s.spark.last[1] }}" r="3"></circle>{% endif %}</svg>
+      <div class="card-foot">durée des {{ s.spark.points.split(' ') | length if s.spark.points else 0 }} dernières exécutions</div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="two-col">
+  <section class="panel">
+    <div class="panel-head"><h2>À regarder</h2><a class="btn small" href="/runs?status=error">Tous les échecs</a></div>
+    {% if not d.failures %}<p class="empty">Aucun échec ni réserve récente.</p>{% endif %}
+    <ul class="list">{% for r in d.failures %}<li><a href="/runs/{{ r.id }}"><div class="row"><b>{{ r.scenario_name }}</b>{{ pill(r.status) }}</div><div class="muted">{{ r.started_at | dt }} · {{ r.message or 'sans message' }}</div></a></li>{% endfor %}</ul>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Dernières exécutions</h2><a class="btn small" href="/runs">Historique</a></div>
+    <div class="tw"><table class="t"><thead><tr><th>Scénario</th><th>Robot</th><th>Début</th><th>Durée</th><th>Éléments</th><th>État</th></tr></thead><tbody>
+      {% for r in d.recent %}<tr><td><a href="/runs/{{ r.id }}">{{ r.scenario_name }}</a></td><td>{% if r.worker is not none and r.worker < (d.team | length) %}{{ d.team[r.worker].name }}{% else %}—{% endif %}</td><td>{{ r.started_at | dt }}</td><td class="num">{{ r.duration_ms | ms }}</td><td class="num">{{ r['items'] | n }}</td><td>{{ pill(r.status) }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty">Aucune exécution pour le moment.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script>setTimeout(function () { if (!document.hidden) location.reload(); }, 30000);</script>{% endblock %}

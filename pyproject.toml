@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "greffier"
-version = "0.1.0"
-description = "Local RPA platform: robot configuration and performance dashboard"
+name = "astree"
+version = "0.2.0"
+description = "Local RPA platform: deposited Python scenarios, a named team of robots, a live open space and a performance dashboard"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,19 +15,21 @@ dependencies = [
     "python-multipart>=0.0.9",
     "apscheduler>=3.10,<4",
     "tzdata>=2024.1",
+    "keyring>=25",
+    "cryptography>=42",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
-greffier = "greffier.__main__:main"
+astree = "astree.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["greffier*"]
+include = ["astree*"]
 
 [tool.setuptools.package-data]
-greffier = ["templates/*.html", "static/*"]
+astree = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

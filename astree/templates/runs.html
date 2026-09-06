@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_status.html" import pill, worker_name %}
+{% block title %}Historique · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Historique des exécutions</h1><p class="sub">{{ total | n }} exécution(s)</p></div></div>
+<form method="get" action="/runs" class="filters">
+  <label>Scénario<select name="scenario"><option value="">Tous</option>{% for k, name in names.items() %}<option value="{{ k }}" {% if k == scenario %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+  <label>État<select name="status"><option value="">Tous</option>{% for k, label in statuses.items() %}<option value="{{ k }}" {% if k == status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button class="btn" type="submit">Filtrer</button>
+</form>
+<section class="panel">
+<div class="tw"><table class="t">
+  <thead><tr><th>#</th><th>Scénario</th><th>Robot</th><th>Début</th><th>Déclench.</th><th>Durée</th><th>Éléments</th><th>État</th><th>Message</th></tr></thead>
+  <tbody>
+  {% for r in runs %}<tr><td><a href="/runs/{{ r.id }}" class="mono">{{ r.id }}</a></td><td><a href="/scenarios/{{ r.scenario_key }}">{{ names.get(r.scenario_key, r.scenario_key) }}</a></td><td>{{ worker_name(r.worker, team) }}</td><td>{{ r.started_at | dt }}</td><td>{{ r.trigger | trigger_label }}</td><td class="num">{{ r.duration_ms | ms }}</td><td class="num">{{ r['items'] | n }}</td><td>{{ pill(r.status) }}</td><td class="muted">{{ r.message or '' }}</td></tr>
+  {% else %}<tr><td colspan="9" class="empty">Aucune exécution.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% if pages > 1 %}<div class="pager">{% if page > 1 %}<a class="btn small" href="/runs?scenario={{ scenario }}&status={{ status }}&page={{ page - 1 }}">Précédent</a>{% endif %}<span>page {{ page }} / {{ pages }}</span>{% if page < pages %}<a class="btn small" href="/runs?scenario={{ scenario }}&status={{ status }}&page={{ page + 1 }}">Suivant</a>{% endif %}</div>{% endif %}
+</section>
+{% endblock %}
