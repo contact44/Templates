@@ -1,22 +1,12 @@
-# Open space background
+# Open space artwork
 
-Drop the generated isometric scene here as `background.png` (or `.webp` / `.jpg`), 1200 px wide is enough.
-When the file exists the dashboard draws it instead of the procedural room, and reads `anchors.json`:
+Generated with Higgsfield from the client's references, then cut and downscaled here.
 
-```json
-{
-  "anchors": {
-    "desk0": {"x": 0.32, "y": 0.62, "face": 1},
-    "desk1": {"x": 0.50, "y": 0.62, "face": 1},
-    "desk2": {"x": 0.68, "y": 0.62, "face": 1},
-    "selms": {"x": 0.18, "y": 0.40, "face": 1},
-    "outlook": {"x": 0.12, "y": 0.58, "face": -1},
-    "docusign": {"x": 0.88, "y": 0.52, "face": -1},
-    "shared": {"x": 0.86, "y": 0.36, "face": 1},
-    "coffee": {"x": 0.60, "y": 0.88, "face": 1}
-  }
-}
-```
+- `background-light.png` · `background-dark.png` — the isometric room, 1200 px wide, one per theme.
+- `anchors-light.json` · `anchors-dark.json` — where a robot stands to use each station, as fractions of the
+  image (`x`, `y` = feet position; `face` = 1 looks right, -1 looks left; `lx`, `ly` = label position),
+  plus `bg`, the colour painted around the room.
+- `char-andromede.png` · `char-orion.png` · `char-sirius.png` — the three characters, transparent background,
+  200 px tall; they are drawn 60 logical pixels tall in the scene, flipped when walking left.
 
-`x` and `y` are fractions of the image size (0 to 1) and mark where a robot stands to use the station;
-`face` is 1 to look right, -1 to look left. Without this file the procedural room is used.
+Remove the background files to fall back to the room drawn in code.
