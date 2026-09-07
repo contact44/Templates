@@ -61,8 +61,7 @@ window.Openspace = (function () {
     success: ["......", ".....g", "....gg", "g..gg.", "gggg..", ".gg..."],
     warning: ["..aa..", "..aa..", "..aa..", "..aa..", "......", "..aa.."],
     error: ["r....r", ".r..r.", "..rr..", "..rr..", ".r..r.", "r....r"],
-    question: ["#####.", "....#.", "..###.", "..#...", "......", "..#..."],
-    zz: ["###.", "..#.", ".#..", "###."]
+    question: ["#####.", "....#.", "..###.", "..#...", "......", "..#..."]
   };
 
   // ---- what each action looks like -----------------------------------------------------------------------------------
@@ -381,10 +380,10 @@ window.Openspace = (function () {
     // what the robot holds
     var hy = top + Math.round(h * 0.42), back = vertical(r.face) === "u";
     if (r.pose === "read" && !r.seated) { var py = hy + (f % 8 < 4 ? 0 : 1); ctx.fillStyle = C.paper; ctx.fillRect(x - 4, py, 8, 9); ctx.fillStyle = C.ink; ctx.fillRect(x - 2, py + 2, 4, 1); ctx.fillRect(x - 2, py + 4, 4, 1); ctx.fillRect(x - 2, py + 6, 3, 1); }
-    else if (r.pose === "coffee") { var cx = x + (horizontal(r.face) === "l" ? -6 : 3), cy = hy - (f % 16 < 4 ? 2 : 0); ctx.fillStyle = C.cup; ctx.fillRect(cx, cy, 4, 4); ctx.fillStyle = C.k; ctx.fillRect(cx + (horizontal(r.face) === "l" ? -1 : 4), cy + 1, 1, 2); if (f % 10 < 5) { ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(cx + 1, cy - 3, 1, 2); } }
-    else if ((r.pose === "type" || (r.seated && r.busy)) && back && f % 4 < 2) { ctx.fillStyle = C.neon; ctx.fillRect(x - 3 + (f % 3), top + Math.round(h * 0.7), 1, 1); }
+    else if (r.pose === "coffee") { var cx = x + (horizontal(r.face) === "l" ? -6 : 3), cy = hy - (f % 16 < 4 ? 2 : 0); ctx.fillStyle = C.cup; ctx.fillRect(cx, cy, 4, 4); ctx.fillStyle = C.k; ctx.fillRect(cx + (horizontal(r.face) === "l" ? -1 : 4), cy + 1, 1, 2); }
     else if (r.pose === "wait" && f % 14 < 8) drawSprite(ctx, ICONS.question, x + 12, top - 6, { "#": C.amber });
-    if (r.pose === "idle" && !r.busy && r.lookUntil <= Date.now() && back && f % 60 < 8) drawSprite(ctx, ICONS.zz, x + 12, top - 4, { "#": C.muted });
+    // typing and sleeping used to add a blinking pixel on the back and a "z" beside the head: read as stray pixels, so
+    // the plates over the head carry that information alone
   };
 
   Scene.prototype.drawPlates = function (r) {
