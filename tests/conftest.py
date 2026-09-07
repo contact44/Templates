@@ -23,9 +23,9 @@ def run(ctx):
     with ctx.step("web.browse", "source"):
         pass
     for i in ctx.step("doc.read", "batch", range(ctx.params["n"])):
-        ctx.item_done()
+        ctx.task_done()
     if ctx.params["fail_one"]:
-        ctx.item_failed("broken item")
+        ctx.item_failed("broken task")   # the earlier name still works
     ctx.metric("mode", ctx.params["mode"])
 '''
 

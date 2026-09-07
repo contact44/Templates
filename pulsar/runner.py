@@ -1,4 +1,8 @@
-"""Executes one scenario run and records everything it does: journal, counters, steps, metrics."""
+"""Executes one scenario run and records everything it does: journal, task counters, actions, metrics.
+
+Vocabulary: a run performs *tasks*, each one a precise action (signing in, downloading a file, clicking a button);
+`ctx.task_done()` / `ctx.task_failed()` count them. `ctx.step(kind, label)` declares the action in progress, and its
+label is the sentence shown over the robot's head in the open space ("Signing in to SELMS+")."""
 
 from __future__ import annotations
 
@@ -40,7 +44,7 @@ class _Step:
         self.clock = time.perf_counter()
         self.ctx.current_step = {"id": self.id, "kind": self.kind, "label": self.label}
         self.ctx._notify()
-        self.ctx.log(f"→ {self.kind}" + (f" · {self.label}" if self.label else ""), "step")
+        self.ctx.log(f"Action {self.kind}" + (f": {self.label}" if self.label else ""), "step")
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -93,22 +97,27 @@ class RunContext:
     def error(self, message: str) -> None:
         self.log(message, "error")
 
-    # counters -------------------------------------------------------------------------
-    def item_done(self, n: int = 1) -> None:
+    # tasks ------------------------------------------------------------------------------
+    def task_done(self, n: int = 1) -> None:
+        """One more task done (a precise action: signed in, downloaded a file, clicked a button)."""
         self.items += n
         self._notify()
 
-    def item_failed(self, message: str) -> None:
+    def task_failed(self, message: str) -> None:
+        """A task that could not be done; the run finishes 'with warnings'."""
         self.errors += 1
         self.warn(message)
         self._notify()
+
+    item_done = task_done        # earlier name, kept for scenarios already written
+    item_failed = task_failed
 
     def metric(self, name: str, value: Any) -> None:
         self.metrics[name] = value
 
     # actions ----------------------------------------------------------------------------
     def step(self, kind: str, label: str | None = None, iterable: Iterable | None = None) -> _Step:
-        """Declare the action in progress. `with ctx.step("web.consulter", "SELMS+")` or `for x in ctx.step(kind, label, items)`."""
+        """Declare the action in progress, with a short sentence shown over the robot: `with ctx.step("web.browse", "Signing in to SELMS+")`, or `for x in ctx.step(kind, label, tasks)` to time a batch."""
         return _Step(self, kind, label, iterable)
 
     def credentials(self, name: str) -> Credential:
@@ -156,7 +165,7 @@ class Runner:
         params = {**scenario.defaults(), **(config["params"] if config else {})}
         ctx = RunContext(run_id, scenario, params, self.db, self.workspace, self.vault, on_progress=self._record)
         self._record(ctx)
-        ctx.log(f"Started · {scenario.name} · trigger: {run['trigger']}")
+        ctx.log(f"Started {scenario.name}, trigger: {run['trigger']}")
         clock = time.perf_counter()
         try:
             try:
@@ -169,8 +178,8 @@ class Runner:
                                    duration_ms=int((time.perf_counter() - clock) * 1000))
                 return self.db.run(run_id)
             status = dbm.STATUS_WARNING if ctx.errors else dbm.STATUS_SUCCESS
-            summary = f"{ctx.items} item(s) processed" + (f", {ctx.errors} failed" if ctx.errors else "")
-            ctx.log(f"Finished · {summary}")
+            summary = f"{ctx.items} task{'' if ctx.items == 1 else 's'} done" + (f", {ctx.errors} failed" if ctx.errors else "")
+            ctx.log(f"Finished: {summary}")
             self.db.finish_run(run_id, status, items=ctx.items, errors=ctx.errors, message=summary, metrics=ctx.metrics,
                                duration_ms=int((time.perf_counter() - clock) * 1000))
             return self.db.run(run_id)

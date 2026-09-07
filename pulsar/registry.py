@@ -212,7 +212,7 @@ def inspect_source(code: str, tmp_dir: Path, existing_keys: dict[str, str], repl
             tmp.unlink()
         except OSError:
             pass
-    checks.append(Check(True, f"Contract met: KEY '{spec.key}', NAME, run(ctx), {len(spec.params)} parameter(s)"))
+    checks.append(Check(True, f"Contract met: KEY '{spec.key}', NAME, run(ctx), {len(spec.params)} parameter{'' if len(spec.params) == 1 else 's'}"))
     owner = existing_keys.get(spec.key)
     if owner and spec.key != replacing:
         if owner == "builtin":
@@ -233,11 +233,11 @@ def inspect_source(code: str, tmp_dir: Path, existing_keys: dict[str, str], repl
     actions = spec.actions
     unknown = [a for a in actions if a not in ACTION_KINDS]
     if actions:
-        checks.append(Check(True, f"{len(actions)} declared action(s): {', '.join(actions)}"))
+        checks.append(Check(True, f"{len(actions)} declared action{'' if len(actions) == 1 else 's'}: {', '.join(actions)}"))
     else:
         checks.append(Check(True, "No action declared with ctx.step: the robot will work at its desk", "warn"))
     if unknown:
-        checks.append(Check(True, f"Action(s) outside the catalogue: {', '.join(unknown)} (shown as desk work)", "warn"))
+        checks.append(Check(True, f"Actions outside the catalogue: {', '.join(unknown)} (shown as desk work)", "warn"))
     imports = imported_modules(code)
     net = [m for m in imports if m in NETWORK_MODULES]
     if net:

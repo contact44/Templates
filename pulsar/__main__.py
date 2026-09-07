@@ -16,7 +16,7 @@ def cmd_serve(settings: Settings, args) -> int:
     from .app import create_app
 
     app = create_app(settings)
-    print(f"{APP_NAME} · http://{settings.host}:{settings.port}  (workspace : {settings.workspace})")
+    print(f"{APP_NAME} at http://{settings.host}:{settings.port} (workspace: {settings.workspace})")
     uvicorn.run(app, host=settings.host, port=settings.port, log_level="info" if args.verbose else "warning")
     return 0
 
@@ -41,7 +41,7 @@ def cmd_run(settings: Settings, args) -> int:
         return 2
     run_id = platform.db.create_run(args.key, "cli")
     run = platform.runner.execute(run_id, worker=0)
-    print(f"#{run['id']} {run['status']} · {run['duration_ms']} ms · {run['message']}")
+    print(f"#{run['id']} {run['status']}, {run['duration_ms']} ms, {run['message']}")
     platform.db.close()
     return 0 if run["status"] != dbm.STATUS_ERROR else 1
 
@@ -53,7 +53,7 @@ def cmd_demo_data(settings: Settings, args) -> int:
     platform = Platform(settings)
     created = seed(platform.db, platform.registry, seed=args.seed, reset=args.reset, team_size=platform.team.size)
     platform.db.close()
-    print(f"{created} demonstration run(s) created in {settings.db_path}")
+    print(f"{created} demonstration runs created in {settings.db_path}")
     return 0
 
 

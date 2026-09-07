@@ -33,7 +33,7 @@ SOURCE_LABELS = {"builtin": "shipped with the code", "deposited": "deposited"}
 def fmt_dt(value, tz: str) -> str:
     local = stats.to_local(value, tz)
     if local is None:
-        return "—"
+        return ""
     if local.date() == datetime.now(local.tzinfo).date():
         return f"today {local:%H:%M}"
     return f"{local:%d %b %H:%M}"
@@ -47,12 +47,12 @@ def fmt_short(value, tz: str) -> str:
 
 
 def fmt_long_date(dt: datetime) -> str:
-    return f"{dt:%A} {dt.day} {dt:%B %Y} · {dt:%H:%M}"
+    return f"{dt:%A} {dt.day} {dt:%B %Y}, {dt:%H:%M}"
 
 
 def fmt_ms(value) -> str:
     if value is None:
-        return "—"
+        return ""
     ms = int(value)
     if ms < 1000:
         return f"{ms} ms"
@@ -67,7 +67,14 @@ def fmt_ms(value) -> str:
 
 
 def fmt_int(value) -> str:
-    return "—" if value is None else f"{int(value):,}"
+    return "" if value is None else f"{int(value):,}"
+
+
+def fmt_plural(value, singular: str, plural: str | None = None) -> str:
+    """'1 run', '3 runs': the count and the word, spelled out rather than 'run(s)'."""
+    n = int(value or 0)
+    word = singular if n == 1 else (plural or singular + "s")
+    return f"{n:,} {word}"
 
 
 class Platform:
@@ -125,7 +132,7 @@ class Platform:
     def start(self) -> None:
         stale = self.db.mark_stale_runs()
         if stale:
-            logging.getLogger("pulsar").warning("%d interrupted run(s) marked as failed", stale)
+            logging.getLogger("pulsar").warning("%d interrupted runs marked as failed", stale)
         self.team.start()
         if not self.settings.demo:
             self.scheduler.start()
@@ -198,7 +205,8 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     env.filters["short"] = lambda v: fmt_short(v, tz)
     env.filters["ms"] = fmt_ms
     env.filters["n"] = fmt_int
-    env.filters["status_label"] = lambda s: STATUS_LABELS.get(s, s or "—")
+    env.filters["status_label"] = lambda s: STATUS_LABELS.get(s, s or "Not run yet")
+    env.filters["plural"] = fmt_plural
     env.filters["trigger_label"] = lambda s: TRIGGER_LABELS.get(s, s)
     env.filters["source_label"] = lambda s: SOURCE_LABELS.get(s, s)
     env.globals["app_name"] = APP_NAME
@@ -275,7 +283,7 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
             if version:
                 return redirect(f"/scenarios/{inspection.key}", ok=f"Version {version} saved and loaded.")
             return render(request, "scenario_new.html", code=code, note=note or "", inspection=inspection, replacing=replacing or "",
-                          flash_err="The scenario was not saved: fix the items marked as errors.")
+                          flash_err="The scenario was not saved: fix the checks marked as errors.")
         inspection = platform.inspect(code, replacing)
         return render(request, "scenario_new.html", code=code, note=note or "", inspection=inspection, replacing=replacing or "")
 
@@ -339,9 +347,9 @@ def create_app(settings: Settings | None = None, start_scheduler: bool = True) -
     def scenarios_reload():
         platform.registry.reload()
         platform.scheduler.sync()
-        msg = f"{len(platform.registry)} scenario(s) loaded."
+        msg = f"{fmt_plural(len(platform.registry), 'scenario')} loaded."
         if platform.registry.errors:
-            msg += f" {len(platform.registry.errors)} file(s) with errors."
+            msg += f" {fmt_plural(len(platform.registry.errors), 'file')} with errors."
         return redirect("/scenarios", ok=msg)
 
     # -- open space now lives on the dashboard ------------------------------------------------------

@@ -35,7 +35,7 @@ class Vault:
     def backend_label(self) -> str:
         if self.backend == "keyring":
             return "System credential manager (keyring)"
-        return f"Local encrypted file · {self._file_path().name}"
+        return f"Local encrypted file ({self._file_path().name})"
 
     # -- public --------------------------------------------------------------------------
 

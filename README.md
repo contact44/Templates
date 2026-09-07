@@ -55,10 +55,10 @@ PARAMS = [{"name": "folder", "label": "Drop folder", "type": "str", "default": "
 
 def run(ctx):
     cred = ctx.credentials("selms")                       # cred.username, cred.password
-    with ctx.step("web.browse", "SELMS+ · sign in"):      # declared action: shown in the open space, timed
+    with ctx.step("web.browse", "Signing in to SELMS+"):  # declared action: its text shows over the robot, timed
         ...
-    for file in ctx.step("doc.read", "Exports", files):
-        ctx.item_done()                                    # or ctx.item_failed("reason") → "with warnings"
+    for file in ctx.step("doc.read", "Reading the exports", files):
+        ctx.task_done()                                    # one task = one precise action; ctx.task_failed("reason") gives "with warnings"
     ctx.metric("contracts", 142)
     path = ctx.output_path("export.xlsx")                  # workspace/outputs/<key>/
 ```

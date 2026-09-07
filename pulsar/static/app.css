@@ -128,6 +128,11 @@ p{margin:0}
 .team{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
 .member{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);font-size:.86rem;background:var(--paper)}
 .member.busy{border-color:var(--accent);background:var(--card)}
+.member .who{min-width:0}
+.member .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.member .state{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.member .state.ready{color:var(--success)}
+.member .state.busy{color:var(--accent)}
 .member .muted{font-size:.78rem}
 .avatar{width:48px;height:64px;border-radius:12px;background:var(--line-2);position:relative;overflow:hidden}
 .avatar::before{content:"";position:absolute;left:14px;top:8px;width:16px;height:14px;border-radius:4px;background:#E9EDF2;border:2px solid #0B1220}
