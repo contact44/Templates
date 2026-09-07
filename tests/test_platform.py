@@ -148,7 +148,7 @@ def test_http_pages_deposit_and_settings(settings):
         assert "background-light.png" in home and "background-dark.png" in home and "sheet-andromede.png" in home
         assert '"seated_back"' in home and "avatar-orion.png" in home and 'class="wordmark"' in home
         assert 'id="theme-toggle"' in home and "pulsar-theme" in home
-        assert "fg-light-desks.png" in home and '"nodes"' in home
+        assert "fg-light" not in home and '"nodes"' in home  # one room geometry for both themes, no cut-outs needed
         assert client.get("/openspace", follow_redirects=False).status_code == 307
 
         # deposit: check, then save, then a second version, then restore

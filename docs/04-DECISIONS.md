@@ -2,6 +2,7 @@
 
 | Date | Decision |
 |---|---|
+| 2026-09-07 | One room for both themes: the dark Higgsfield drawing is the master, the light room is the same picture repainted (`tools/openspace_light.py`), so every desk and chair is at the same place in both themes and one scene description serves both (the light room generated separately, with other desks and no chairs, is dropped). Seated robots are drawn in the chairs painted in the room: seat positions measured on the picture, the back-view sprite cut at the seat, each turned towards its desk. |
 | 2026-09-07 | Seats measured on the artwork rather than estimated: for each room the chair base must stand on clear floor and the desk must be behind the character, and each seat is turned towards the desk actually next to it. Seated poses normalised so the three characters face the same way before the engine mirrors them. |
 | 2026-09-06 | Light / dark switch in the header (remembered per browser, `data-theme` on the page; the open space follows). Seated robots use their own Higgsfield-generated sprite, chair included, instead of a character placed behind a chair drawn in the room. |
 | 2026-09-06 | Header: the Samsung wordmark in white on the brand blue (a slot in `static/brand/` takes the official SVG), the product name **Pulsar** unchanged. Robots drawn from the Higgsfield turnaround sheets (six poses each, incl. seated at a desk); chairs added to the light room; a quest-style notice at the bottom right of the open space when a run finishes; the robots' portraits in the team list. |

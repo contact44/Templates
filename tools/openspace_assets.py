@@ -6,17 +6,18 @@ Inputs
   tools/openspace-src/<name>.txt            one character: palette + the standing poses as text (front, front34,
                                             profile, back34, back), cut from the Higgsfield turnaround sheet
   tools/openspace-src/<name>-seat.txt       the same character seated on an office chair, generated separately with
-                                            Higgsfield: seated_back and seated_front, the chair included
+                                            Higgsfield: seated_back and seated_front (the back view is cut at the seat:
+                                            the robot sits in the chair painted in the room)
   tools/openspace-src/<name>.png            the original front view (portraits are cut from it)
-  pulsar/static/openspace/background-*.png  the two rooms
-  pulsar/static/openspace/scene-*.json      anchors, walk graph, occluder polygons (image pixels)
+  pulsar/static/openspace/background-*.png  the room, dark (master) and light (painted from it by openspace_light.py)
+  pulsar/static/openspace/scene-*.json      anchors, walk graph, occluder polygons (image pixels), same for both
 
 Outputs (pulsar/static/openspace/)
   sheet-<name>.png   sprite sheet, the six poses side by side, feet on the last row of each pose
   chars.json         sheet metadata (where each pose is in the sheet, its size)
   avatar-<name>.png  96 x 128 full-body portrait for the team list
   fg-<theme>-<n>.png furniture cut out of the room, drawn over a robot standing behind it
-  scene-*.json       updated in place with the placement of the cut-outs and chairs
+  scene-*.json       updated in place with the placement of the cut-outs
 --check <dir> also writes overlays showing anchors, graph and occluders on each room.
 """
 
@@ -32,10 +33,14 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "openspace-src"
 OUT = ROOT / "pulsar" / "static" / "openspace"
 CHARACTERS = ["andromede", "orion", "sirius"]
-# Higgsfield did not turn every seated pose the same way; these are mirrored so that all three face up-left,
-# which is what the engine expects before it flips them for a desk on the other side.
-MIRROR_SEATED = {"sirius"}
+# The engine keeps the un-flipped seated frames for a desk on the left: seated_back must face up-left (desk and
+# keyboard on the left of the character), seated_front must face down-left. Higgsfield drew the back views turned
+# other way for some of them, so those are mirrored here.
+MIRROR_SEATED = {"seated_back": {"andromede", "sirius"}, "seated_front": {"andromede"}}
 POSES = ["front", "front34", "profile", "back34", "back", "seated_back", "seated_front"]
+# The back view of a seated character is cut at the seat: the robot is drawn in the chair painted in the room (its
+# bottom row on the seat), so the chair drawn by Higgsfield under it would only get in the way.
+SEATED_BACK_ROWS = 26
 DIGITS = "0123456789abcdef"
 
 
@@ -101,8 +106,10 @@ def build_sheets() -> dict:
         seat = SRC / f"{name}-seat.txt"
         if seat.exists():
             seated = read_sprite_text(seat)[1]
-            if name in MIRROR_SEATED:
-                seated = {k: v.transpose(Image.FLIP_LEFT_RIGHT) for k, v in seated.items()}
+            seated = {k: (v.transpose(Image.FLIP_LEFT_RIGHT) if name in MIRROR_SEATED.get(k, ()) else v)
+                      for k, v in seated.items()}
+            back = seated["seated_back"]
+            seated["seated_back"] = back.crop((0, 0, back.width, SEATED_BACK_ROWS))
             frames.update(seated)
         height = max(f.height for f in frames.values())
         width = sum(f.width + 1 for f in frames.values()) - 1

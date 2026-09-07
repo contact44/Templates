@@ -1,10 +1,12 @@
 /* Samsung Pulsar · open space — the team at work, drawn like a small isometric video game.
    No dependencies. The rooms and the characters come from the Higgsfield artwork (static/openspace/):
-   - background-<theme>.png + scene-<theme>.json: the room, where each station is, the walk graph the robots follow,
-     the furniture cut out as foreground pieces (drawn over a robot standing behind them)
-   - sheet-<name>.png: one character in seven poses (front, 3/4 front, profile, 3/4 back, back, and seated on an
-     office chair seen from the back or the front),
-     animated here (walk, run, type, read, coffee, wait); the right-facing views are the left ones mirrored */
+   - background-<theme>.png + scene-<theme>.json: the room (the same drawing in both themes, the light one painted
+     from the dark one), where each station is, the walk graph the robots follow, optional furniture cut out as
+     foreground pieces (drawn over a robot standing behind them)
+   - sheet-<name>.png: one character in seven poses (front, 3/4 front, profile, 3/4 back, back, and seated seen from
+     the back or the front; the back view ends at the seat, so a seated robot is drawn in the chair painted in the
+     room, its last row on the seat), animated here (walk, run, type, read, coffee, wait); the right-facing views
+     are the left ones mirrored */
 window.Openspace = (function () {
   "use strict";
 
