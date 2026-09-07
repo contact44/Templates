@@ -2,6 +2,7 @@
 
 | Date | Decision |
 |---|---|
+| 2026-09-07 | Seats measured on the artwork rather than estimated: for each room the chair base must stand on clear floor and the desk must be behind the character, and each seat is turned towards the desk actually next to it. Seated poses normalised so the three characters face the same way before the engine mirrors them. |
 | 2026-09-06 | Light / dark switch in the header (remembered per browser, `data-theme` on the page; the open space follows). Seated robots use their own Higgsfield-generated sprite, chair included, instead of a character placed behind a chair drawn in the room. |
 | 2026-09-06 | Header: the Samsung wordmark in white on the brand blue (a slot in `static/brand/` takes the official SVG), the product name **Pulsar** unchanged. Robots drawn from the Higgsfield turnaround sheets (six poses each, incl. seated at a desk); chairs added to the light room; a quest-style notice at the bottom right of the open space when a run finishes; the robots' portraits in the team list. |
 | 2026-09-06 | Open space played like a video game: robots 38 px tall (about two thirds of the furniture), seen from the front or the back, walking along corridors round the furniture (walk graph per room), running to a station when a scenario starts, sitting at their desk otherwise; furniture in front of a robot masks it. Sprites are pixel-art cuts of the Higgsfield characters; the back view is derived from the front one. |

@@ -32,6 +32,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "openspace-src"
 OUT = ROOT / "pulsar" / "static" / "openspace"
 CHARACTERS = ["andromede", "orion", "sirius"]
+# Higgsfield did not turn every seated pose the same way; these are mirrored so that all three face up-left,
+# which is what the engine expects before it flips them for a desk on the other side.
+MIRROR_SEATED = {"sirius"}
 POSES = ["front", "front34", "profile", "back34", "back", "seated_back", "seated_front"]
 DIGITS = "0123456789abcdef"
 
@@ -97,7 +100,10 @@ def build_sheets() -> dict:
         _, frames = read_sprite_text(SRC / f"{name}.txt")
         seat = SRC / f"{name}-seat.txt"
         if seat.exists():
-            frames.update(read_sprite_text(seat)[1])
+            seated = read_sprite_text(seat)[1]
+            if name in MIRROR_SEATED:
+                seated = {k: v.transpose(Image.FLIP_LEFT_RIGHT) for k, v in seated.items()}
+            frames.update(seated)
         height = max(f.height for f in frames.values())
         width = sum(f.width + 1 for f in frames.values()) - 1
         sheet = Image.new("RGBA", (width, height), (0, 0, 0, 0))
