@@ -2,5 +2,5 @@
 <span class="pill {{ status or 'none' }}"><i class="dot"></i>{{ status | status_label }}</span>
 {%- endmacro %}
 {% macro worker_name(index, team) -%}
-{%- if index is not none and index < (team | length) %}{{ team[index] }}{% else %}—{% endif -%}
+{%- if index is not none and index < (team | length) %}{{ team[index] }}{% endif -%}
 {%- endmacro %}

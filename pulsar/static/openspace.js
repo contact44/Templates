@@ -68,6 +68,10 @@ window.Openspace = (function () {
   var KIND_STATION = { "mail.read": "outlook", "mail.reply": "outlook", "web.browse": "selms", "propose": "docusign", "send": "docusign", "archive": "shared", "wait": "coffee" };
   var KIND_POSE = { "mail.read": "type", "mail.reply": "type", "doc.read": "read", "doc.fill": "type", "web.browse": "type", "verify": "read", "propose": "wait", "send": "type", "archive": "type", "wait": "coffee" };
   var FRONT_POSES = { read: true, coffee: true, wait: true };   // poses where the robot turns towards the viewer
+  // what shows over the head when a scenario declares an action kind without a sentence of its own
+  var KIND_TEXT = { "mail.read": "Reading mail", "mail.reply": "Replying to mail", "doc.read": "Reading a document", "doc.fill": "Filling a document",
+                    "web.browse": "Browsing", verify: "Checking", propose: "Proposing", send: "Sending", archive: "Filing", wait: "Waiting" };
+  function actionText(r) { return r.step ? (r.step.label || KIND_TEXT[r.step.kind] || r.step.kind) : "Working"; }
 
   // ---- facing: "u" "d" "l" "r" or the diagonals "ul" "ur" "dl" "dr" ----------------------------------------------------
   function facing(dx, dy, previous) {
@@ -244,9 +248,9 @@ window.Openspace = (function () {
   };
   Scene.prototype.toast = function (ev) {
     var kind = TOAST[ev.status] ? ev.status : "success", now = Date.now();
-    var detail = (ev.worker ? ev.worker + " · " : "") + (ev.items != null ? ev.items + " item(s)" : "");
+    var detail = (ev.worker ? ev.worker + ", " : "") + (ev.items != null ? ev.items + (ev.items === 1 ? " task" : " tasks") : "");
     if (kind === "error" && ev.message) detail = String(ev.message).slice(0, 34);
-    this.toasts.push({ kind: kind, title: TOAST[kind].title + (TOAST[kind].sub ? " · " + TOAST[kind].sub : ""), name: ev.scenario_name || "Scenario", detail: detail, born: now, until: now + 7000 });
+    this.toasts.push({ kind: kind, title: TOAST[kind].title + (TOAST[kind].sub ? ", " + TOAST[kind].sub : ""), name: ev.scenario_name || "Scenario", detail: detail, born: now, until: now + 7000 });
     if (this.toasts.length > 3) this.toasts.shift();
   };
   Scene.prototype.drawToasts = function () {
@@ -392,9 +396,9 @@ window.Openspace = (function () {
     var fr = sheet && sheet.frames[poseFor(r).name], top = y - (fr ? fr.h : 38);
     var name = r.name || ("ROBOT " + (r.index + 1)), nw = textWidth(name);
     plate(ctx, name, Math.max(2, Math.min(W - nw - 4, x - nw / 2)), top - 10, C.w, r.busy ? C.blue : C.plate);
-    var text = r.busy ? ((r.step && r.step.kind) ? r.step.kind : "WORKING") : (r.moving ? "" : "AVAILABLE");
-    if (r.busy && r.items) text += " " + r.items;
-    if (text) { var w = textWidth(text); plate(ctx, text, Math.max(2, Math.min(W - w - 4, x - w / 2)), top - 19, r.busy ? C.neon : C.muted, "rgba(11,18,32,.92)"); }
+    // the current task in words ("Signing in to SELMS+"), or "Ready to work" in green
+    var text = r.busy ? actionText(r) : (r.moving ? "" : "Ready to work");
+    if (text) { var w = Math.min(textWidth(text), 140); plate(ctx, text, Math.max(2, Math.min(W - w - 4, x - w / 2)), top - 19, r.busy ? C.neon : C.green, "rgba(11,18,32,.92)", 140); }
     if (r.fresh && r.freshUntil > Date.now() && ICONS[r.fresh]) { drawSprite(ctx, BUBBLE, x + 8, top - 33, { k: C.k, w: C.w }); drawSprite(ctx, ICONS[r.fresh], x + 12, top - 31, { g: C.green, a: C.amber, r: C.red }); }
   };
 
@@ -402,10 +406,11 @@ window.Openspace = (function () {
     var self = this;
     if (this.teamEl) {
       this.teamEl.innerHTML = this.robots.map(function (r, i) {
-        var s = r.busy ? esc(r.scenario || "") + (r.step ? " · " + esc(r.step.kind) + (r.step.label ? " · " + esc(r.step.label) : "") : "") + " · " + r.items + " item(s)" + (r.runId ? ' · <a href="/runs/' + r.runId + '">run #' + r.runId + "</a>" : "") : "available";
+        var state = r.busy ? '<span class="state busy">' + esc(actionText(r)) + "</span>" : '<span class="state ready">Ready to work</span>';
+        var detail = r.busy ? '<div class="muted">' + esc(r.scenario || "") + ", " + r.items + (r.items === 1 ? " task" : " tasks") + " done" + (r.runId ? ', <a href="/runs/' + r.runId + '">run #' + r.runId + "</a>" : "") + "</div>" : "";
         var portrait = (self.config.avatars || [])[i % 3];
         var avatar = portrait ? '<img src="' + esc(portrait) + '" alt="">' : "<i></i>";
-        return '<div class="member ' + (r.busy ? "busy" : "free") + '"><div class="avatar" style="--tie:' + TIES[i % TIES.length] + '">' + avatar + '</div><div><b>' + esc(r.name) + "</b><div class=\"muted\">" + s + "</div></div></div>";
+        return '<div class="member ' + (r.busy ? "busy" : "free") + '"><div class="avatar" style="--tie:' + TIES[i % TIES.length] + '">' + avatar + '</div><div class="who"><div class="row"><b>' + esc(r.name) + "</b>" + state + "</div>" + detail + "</div></div>";
       }).join("");
     }
     if (this.queueEl) {

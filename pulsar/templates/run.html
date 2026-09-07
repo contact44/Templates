@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_status.html" import pill, worker_name %}
-{% block title %}Run #{{ run.id }} · {{ app_name }}{% endblock %}
+{% block title %}Run #{{ run.id }}, {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><div class="crumb"><a href="/runs">History</a> / <span class="mono">#{{ run.id }}</span></div>
@@ -14,14 +14,14 @@
     <div><dt>Finished</dt><dd>{{ run.finished_at | dt if run.finished_at else 'in progress' }}</dd></div>
     <div><dt>Duration</dt><dd>{{ run.duration_ms | ms }}</dd></div>
     <div><dt>Trigger</dt><dd>{{ run.trigger | trigger_label }}</dd></div>
-    <div><dt>Items processed</dt><dd>{{ run['items'] | n }}</dd></div>
-    <div><dt>Items failed</dt><dd>{{ run.errors | n }}</dd></div>
+    <div><dt>Tasks done</dt><dd>{{ run['items'] | n }}</dd></div>
+    <div><dt>Tasks failed</dt><dd>{{ run.errors | n }}</dd></div>
     {% for k, v in run.metrics.items() %}<div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>{% endfor %}
   </dl>
 </section>
 {% if steps %}
 <section class="panel">
-  <div class="panel-head"><h2>Actions</h2><span class="muted small">{{ steps | length }} declared action(s)</span></div>
+  <div class="panel-head"><h2>Actions</h2><span class="muted small">{{ steps | length | plural('declared action') }}</span></div>
   {% set total = steps | map(attribute='duration_ms') | select('number') | sum %}
   <div class="timeline">
     {% for s in steps %}

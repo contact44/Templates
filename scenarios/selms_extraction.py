@@ -31,7 +31,7 @@ def period(choice: str) -> tuple[date, date]:
 def run(ctx):
     start, end = period(ctx.params["month"])
     ctx.info(f"Period: from {start:%d/%m/%Y} to {end:%d/%m/%Y} (excluded)")
-    with ctx.step("web.browse", "SELMS+ · sign in"):
+    with ctx.step("web.browse", "Signing in to SELMS+"):
         cred = ctx.credentials(ctx.params["credential"])
         ctx.info(f"Credential '{cred.name}' loaded for user {cred.username}")
         # The navigation (open, filter, export) will be written here from the SELMS+ screen map.

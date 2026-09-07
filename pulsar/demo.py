@@ -10,8 +10,8 @@ from .db import Database
 from .registry import Registry
 
 STEP_SETS = {
-    "web.browse": [("web.browse", "Sign in"), ("web.browse", "Filter and export"), ("verify", "File check"), ("archive", "Shared folder")],
-    "default": [("doc.read", "Reading"), ("verify", "Check"), ("archive", "Filing")],
+    "web.browse": [("web.browse", "Signing in"), ("web.browse", "Filtering and exporting"), ("verify", "Checking the file"), ("archive", "Filing in the shared folder")],
+    "default": [("doc.read", "Reading the documents"), ("verify", "Checking"), ("archive", "Filing")],
 }
 
 
@@ -37,7 +37,7 @@ def seed(database: Database, registry: Registry, seed: int = 7, reset: bool = Fa
                 end = start + timedelta(milliseconds=duration)
                 run_id = database.create_run(scenario.key, "demo", queued_at=start)
                 database.start_run(run_id, rng.randrange(team_size), started_at=start)
-                database.add_log(run_id, "info", f"Started · {scenario.name} · demonstration data", ts=start)
+                database.add_log(run_id, "info", f"Started {scenario.name}, demonstration data", ts=start)
                 t = start
                 for kind, label in steps:
                     sid = database.start_step(run_id, kind, label)
@@ -49,8 +49,8 @@ def seed(database: Database, registry: Registry, seed: int = 7, reset: bool = Fa
                     message = "TimeoutError: source unavailable (simulated)"
                     database.add_log(run_id, "error", message, ts=end)
                 else:
-                    message = f"{items} item(s) processed" + (f", {errors} failed" if errors else "")
-                    database.add_log(run_id, "info", f"Finished · {message}", ts=end)
+                    message = f"{items} tasks done" + (f", {errors} failed" if errors else "")
+                    database.add_log(run_id, "info", f"Finished: {message}", ts=end)
                 database.finish_run(run_id, status, items=items, errors=errors, message=message, finished_at=end, duration_ms=duration)
                 created += 1
     return created

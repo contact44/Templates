@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "_status.html" import pill %}
-{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block title %}Dashboard, {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><h1>Robot activity</h1>
-  <p class="sub">{{ d.busy }} of {{ d.team | length }} robots busy · {{ d.scenarios_enabled }} of {{ d.scenarios | length }} scenarios enabled · live view refreshes every 2 s, figures every 30 s</p></div>
+  <p class="sub">{{ d.busy }} of {{ d.team | length }} robots busy, {{ d.scenarios_enabled }} of {{ d.scenarios | length }} scenarios enabled. The live view refreshes every 2 seconds, the figures every 30 seconds.</p></div>
   <div class="legend"><span><i class="sw" style="background:var(--running)"></i>Working</span><span><i class="sw success"></i>Success</span><span><i class="sw warning"></i>With warnings</span><span><i class="sw error"></i>Failed</span></div>
 </div>
-{% if d.load_errors %}<div class="flash err"><b>Scenario files with errors:</b>{% for file, msg in d.load_errors.items() %}<div class="mono">{{ file }} — {{ msg }}</div>{% endfor %}</div>{% endif %}
+{% if d.load_errors %}<div class="flash err"><b>Scenario files with errors:</b>{% for file, msg in d.load_errors.items() %}<div class="mono">{{ file }}: {{ msg }}</div>{% endfor %}</div>{% endif %}
 
 <section class="panel openspace-panel">
   <div class="openspace-wrap"><canvas id="openspace" aria-label="The open space: the team at work"></canvas></div>
@@ -16,9 +16,9 @@
       {% for w in d.team %}
       <div class="member {{ 'busy' if w.busy else 'free' }}">
         <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})">{% set portrait = openspace_config.avatars[loop.index0 % 3] if openspace_config.avatars else None %}{% if portrait %}<img src="{{ portrait }}" alt="">{% else %}<i></i>{% endif %}</div>
-        <div><b>{{ w.name }}</b>
-          {% if w.busy %}<div class="muted">{{ w.scenario_name }}{% if w.step %} · {{ w.step.kind }}{% if w.step.label %} · {{ w.step.label }}{% endif %}{% endif %} · {{ w['items'] }} item(s) · <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>
-          {% else %}<div class="muted">available</div>{% endif %}
+        <div class="who">
+          <div class="row"><b>{{ w.name }}</b>{% if w.busy %}<span class="state busy">{{ w.step.label if w.step and w.step.label else (w.step.kind if w.step else 'Working') }}</span>{% else %}<span class="state ready">Ready to work</span>{% endif %}</div>
+          {% if w.busy %}<div class="muted">{{ w.scenario_name }}, {{ w['items'] | plural('task') }} done, <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>{% endif %}
         </div>
       </div>
       {% endfor %}
@@ -29,10 +29,10 @@
 
 <section class="tiles">
   <div class="tile hero"><div class="k">Runs today</div><div class="v">{{ d.today.runs | n }}</div>
-    <div class="d"><span class="dot success"></span>{{ d.today.success }} succeeded <span class="dot warning"></span>{{ d.today.warning }} with warnings <span class="dot error"></span>{{ d.today.error }} failed{% if d.today.running %} · {{ d.today.running }} in progress{% endif %}</div></div>
-  <div class="tile"><div class="k">Success rate · 7 days</div><div class="v">{% if d.week.rate is none %}—{% else %}{{ d.week.rate }} %{% endif %}</div><div class="d">{{ d.week.runs | n }} runs · {{ d.week.errors }} failure(s)</div></div>
-  <div class="tile"><div class="k">Average duration · 7 days</div><div class="v">{{ d.week.avg_ms | ms }}</div><div class="d">per finished run</div></div>
-  <div class="tile"><div class="k">Items processed · 7 days</div><div class="v">{{ d.week['items'] | n }}</div><div class="d">{{ d.today['items'] | n }} today</div></div>
+    <div class="d"><span class="dot success"></span>{{ d.today.success }} succeeded <span class="dot warning"></span>{{ d.today.warning }} with warnings <span class="dot error"></span>{{ d.today.error }} failed{% if d.today.running %}, {{ d.today.running }} in progress{% endif %}</div></div>
+  <div class="tile"><div class="k">Success rate over 7 days</div><div class="v">{% if d.week.rate is none %}<span class="small muted">no run yet</span>{% else %}{{ d.week.rate }} %{% endif %}</div><div class="d">{{ d.week.runs | plural('run') }}, {{ d.week.errors }} failed</div></div>
+  <div class="tile"><div class="k">Average duration over 7 days</div><div class="v">{{ d.week.avg_ms | ms or '' }}</div><div class="d">per finished run</div></div>
+  <div class="tile"><div class="k">Tasks done over 7 days</div><div class="v">{{ d.week['items'] | n }}</div><div class="d">{{ d.today['items'] | n }} today</div></div>
 </section>
 
 <section class="panel">
@@ -43,7 +43,7 @@
     {% for t in d.days.ticks %}<line class="grid" x1="0" x2="{{ d.days.width }}" y1="{{ t.y }}" y2="{{ t.y }}"></line><text class="tick" x="0" y="{{ t.y - 3 }}">{{ t.value }}</text>{% endfor %}
     <line class="axis" x1="0" x2="{{ d.days.width }}" y1="{{ d.days.baseline }}" y2="{{ d.days.baseline }}"></line>
     {% for c in d.days.columns %}
-    <g class="col"><title>{{ c.date.strftime('%d %b') }} · {{ c.total }} run(s): {{ c.success }} succeeded, {{ c.warning }} with warnings, {{ c.error }} failed</title>
+    <g class="col"><title>{{ c.date.strftime('%d %b') }}: {{ c.total | plural('run') }}, {{ c.success }} succeeded, {{ c.warning }} with warnings, {{ c.error }} failed</title>
       <rect class="hit" x="{{ c.x - 6 }}" y="0" width="{{ c.w + 12 }}" height="{{ d.days.baseline }}"></rect>
       {% for s in c.segments %}{% if s.path %}<path class="bar {{ s.status }}" d="{{ s.path }}"></path>{% else %}<rect class="bar {{ s.status }}" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}"></rect>{% endif %}{% endfor %}
       {% if c.show_value %}<text class="val" x="{{ c.cx }}" y="{{ (c.segments | last).y - 4 }}" text-anchor="middle">{{ c.total }}</text>{% endif %}
@@ -60,9 +60,9 @@
     {% for s in d.scenarios %}
     <a class="card {{ '' if s.enabled else 'off' }}" href="/scenarios/{{ s.key }}">
       <div class="card-head"><span class="name">{{ s.name }}</span>{% if s.running %}<span class="pill {{ s.active.status }}"><i class="dot"></i>{{ s.active.status | status_label }}</span>{% else %}{{ pill(s.last_status) }}{% endif %}</div>
-      <div class="card-meta"><span>Last run {{ s.last.started_at | dt if s.last else '—' }}</span>
+      <div class="card-meta"><span>{% if s.last %}Last run {{ s.last.started_at | dt }}{% else %}Never run{% endif %}</span>
         <span>{% if not s.enabled %}Disabled{% elif s.next_run %}Next {{ s.next_run | dt }}{% elif s.schedule %}Invalid schedule{% else %}On demand{% endif %}</span></div>
-      <div class="card-stats"><div><b>{% if s.rate_7d is none %}—{% else %}{{ s.rate_7d }} %{% endif %}</b><span>success 7 d</span></div><div><b>{{ s.avg_ms_7d | ms }}</b><span>avg. duration</span></div><div><b>{{ s.items_7d | n }}</b><span>items 7 d</span></div></div>
+      <div class="card-stats"><div><b>{% if s.rate_7d is none %}&nbsp;{% else %}{{ s.rate_7d }} %{% endif %}</b><span>success, 7 days</span></div><div><b>{{ s.avg_ms_7d | ms or '&nbsp;' | safe }}</b><span>average duration</span></div><div><b>{{ s.items_7d | n }}</b><span>tasks, 7 days</span></div></div>
       <svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">{% if s.spark.points %}<polygon class="area" points="{{ s.spark.area }}"></polygon><polyline class="line" points="{{ s.spark.points }}"></polyline><circle class="end" cx="{{ s.spark.last[0] }}" cy="{{ s.spark.last[1] }}" r="3"></circle>{% endif %}</svg>
       <div class="card-foot">duration of the last {{ s.spark.points.split(' ') | length if s.spark.points else 0 }} runs</div>
     </a>
@@ -74,12 +74,12 @@
   <section class="panel">
     <div class="panel-head"><h2>Needs a look</h2><a class="btn small" href="/runs?status=error">All failures</a></div>
     {% if not d.failures %}<p class="empty">No recent failure or warning.</p>{% endif %}
-    <ul class="list">{% for r in d.failures %}<li><a href="/runs/{{ r.id }}"><div class="row"><b>{{ r.scenario_name }}</b>{{ pill(r.status) }}</div><div class="muted">{{ r.started_at | dt }} · {{ r.message or 'no message' }}</div></a></li>{% endfor %}</ul>
+    <ul class="list">{% for r in d.failures %}<li><a href="/runs/{{ r.id }}"><div class="row"><b>{{ r.scenario_name }}</b>{{ pill(r.status) }}</div><div class="muted">{{ r.started_at | dt }}, {{ r.message or 'no message' }}</div></a></li>{% endfor %}</ul>
   </section>
   <section class="panel">
     <div class="panel-head"><h2>Latest runs</h2><a class="btn small" href="/runs">History</a></div>
-    <div class="tw"><table class="t"><thead><tr><th>Scenario</th><th>Robot</th><th>Started</th><th>Duration</th><th>Items</th><th>Status</th></tr></thead><tbody>
-      {% for r in d.recent %}<tr><td><a href="/runs/{{ r.id }}">{{ r.scenario_name }}</a></td><td>{% if r.worker is not none and r.worker < (d.team | length) %}{{ d.team[r.worker].name }}{% else %}—{% endif %}</td><td>{{ r.started_at | dt }}</td><td class="num">{{ r.duration_ms | ms }}</td><td class="num">{{ r['items'] | n }}</td><td>{{ pill(r.status) }}</td></tr>
+    <div class="tw"><table class="t"><thead><tr><th>Scenario</th><th>Robot</th><th>Started</th><th>Duration</th><th>Tasks</th><th>Status</th></tr></thead><tbody>
+      {% for r in d.recent %}<tr><td><a href="/runs/{{ r.id }}">{{ r.scenario_name }}</a></td><td>{% if r.worker is not none and r.worker < (d.team | length) %}{{ d.team[r.worker].name }}{% endif %}</td><td>{{ r.started_at | dt }}</td><td class="num">{{ r.duration_ms | ms }}</td><td class="num">{{ r['items'] | n }}</td><td>{{ pill(r.status) }}</td></tr>
       {% else %}<tr><td colspan="6" class="empty">No runs yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </section>
