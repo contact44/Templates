@@ -631,6 +631,10 @@ PARAMS = [
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
 SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
+MISSING = (&#39;{what} is not installed on this machine. Close the platform and start it again with start.bat: it &#39;
+           &#39;checks the installation on every run and brings in what is missing. To do it by hand instead, from the &#39;
+           &#39;folder of the platform: .venv\\Scripts\\python.exe -m pip install -e &#34;.[rpa]&#34;  (the quotes matter in &#39;
+           &#39;PowerShell).&#39;)
 
 
 # ---- reading a label as these screens write it -------------------------------------------------------------------
@@ -1001,12 +1005,12 @@ def open_session(ctx) -&gt; Session:
         try:
             return PlaywrightSession(profile, ctx.params[&#34;headless&#34;], ctx.params[&#34;browser_path&#34;])
         except ImportError:
-            raise RuntimeError(&#34;Playwright is not installed: run  pip install -e .[rpa]&#34;) from None
+            raise RuntimeError(MISSING.format(what=&#34;Playwright&#34;)) from None
     try:
         return SeleniumSession(kind, profile, ctx.params[&#34;headless&#34;], ctx.params[&#34;browser_path&#34;],
                                ctx.params[&#34;ie_driver_path&#34;])
     except ImportError:
-        raise RuntimeError(&#34;Selenium is not installed: run  pip install -e .[rpa]&#34;) from None
+        raise RuntimeError(MISSING.format(what=&#34;Selenium&#34;)) from None
     except Exception as error:
         if kind == &#34;edge_ie&#34;:
             raise RuntimeError(
@@ -1191,7 +1195,8 @@ def run(ctx):
                 ctx.task_done()
                 return
             except ImportError:
-                ctx.warn(&#34;pywin32 is not installed, Outlook cannot be used: run  pip install -e .[rpa]&#34;)
+                ctx.warn(&#34;pywin32 is not installed, so Outlook cannot be used. Start the platform again with &#34;
+                         &#34;start.bat, which checks the installation.&#34;)
             except Exception as error:
                 ctx.warn(f&#34;Outlook could not send the email: {error}&#34;)
         if ctx.params[&#34;smtp_host&#34;].strip():
@@ -1411,6 +1416,10 @@ PARAMS = [
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
 SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
+MISSING = (&#39;{what} is not installed on this machine. Close the platform and start it again with start.bat: it &#39;
+           &#39;checks the installation on every run and brings in what is missing. To do it by hand instead, from the &#39;
+           &#39;folder of the platform: .venv\\Scripts\\python.exe -m pip install -e &#34;.[rpa]&#34;  (the quotes matter in &#39;
+           &#39;PowerShell).&#39;)
 
 
 # ---- reading a label as these screens write it -------------------------------------------------------------------
@@ -1781,12 +1790,12 @@ def open_session(ctx) -&gt; Session:
         try:
             return PlaywrightSession(profile, ctx.params[&#34;headless&#34;], ctx.params[&#34;browser_path&#34;])
         except ImportError:
-            raise RuntimeError(&#34;Playwright is not installed: run  pip install -e .[rpa]&#34;) from None
+            raise RuntimeError(MISSING.format(what=&#34;Playwright&#34;)) from None
     try:
         return SeleniumSession(kind, profile, ctx.params[&#34;headless&#34;], ctx.params[&#34;browser_path&#34;],
                                ctx.params[&#34;ie_driver_path&#34;])
     except ImportError:
-        raise RuntimeError(&#34;Selenium is not installed: run  pip install -e .[rpa]&#34;) from None
+        raise RuntimeError(MISSING.format(what=&#34;Selenium&#34;)) from None
     except Exception as error:
         if kind == &#34;edge_ie&#34;:
             raise RuntimeError(
@@ -1971,7 +1980,8 @@ def run(ctx):
                 ctx.task_done()
                 return
             except ImportError:
-                ctx.warn(&#34;pywin32 is not installed, Outlook cannot be used: run  pip install -e .[rpa]&#34;)
+                ctx.warn(&#34;pywin32 is not installed, so Outlook cannot be used. Start the platform again with &#34;
+                         &#34;start.bat, which checks the installation.&#34;)
             except Exception as error:
                 ctx.warn(f&#34;Outlook could not send the email: {error}&#34;)
         if ctx.params[&#34;smtp_host&#34;].strip():

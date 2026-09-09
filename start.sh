@@ -10,11 +10,15 @@ if ! command -v python3 >/dev/null; then
 fi
 
 if [ ! -x ".venv/bin/python" ]; then
-  echo "Preparing Samsung Pulsar. This happens once and takes a few minutes."
+  echo "Preparing Samsung Pulsar. This first time takes a few minutes."
   python3 -m venv .venv
   .venv/bin/python -m pip install --quiet --upgrade pip
-  .venv/bin/python -m pip install --quiet -e .[rpa]
 fi
+
+# Always, not only the first time: a new version of the platform needs what it added since the last one, and pip
+# does nothing when everything is already there.
+echo "Checking the installation."
+.venv/bin/python -m pip install --quiet -e ".[rpa]"
 
 echo "Starting Samsung Pulsar on http://127.0.0.1:8765 (press Ctrl+C to stop)"
 (sleep 4 && (command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:8765 || open http://127.0.0.1:8765) >/dev/null 2>&1) &

@@ -315,3 +315,20 @@ def test_labels_are_read_as_these_screens_write_them():
     assert looks_like("\u25aa Request Date", "Request Date") and looks_like("\u25aa Closed", "Closed")
     assert looks_like("Contract\u00a0Mgmt.", "Contract Mgmt.")
     assert not looks_like("Confirmer", "Confirm")
+
+
+def test_the_launchers_check_the_installation_on_every_run():
+    """A platform that gains a dependency must not leave the person who already installed it stranded: the launchers
+    install on every start, not only the first, so a new version brings in what it needs by simply being started."""
+    for name in ("start.bat", "start.sh"):
+        script = (ROOT / name).read_text(encoding="utf-8")
+        install = [line for line in script.splitlines() if "pip install" in line and "[rpa]" in line]
+        assert len(install) == 1, name
+        line = install[0]
+
+        # the install line must sit outside the block that only runs when the environment is missing
+        before = script[:script.index(line)]
+        if name == "start.bat":
+            assert before.rindex("if not exist") < before.rindex(")"), name
+        else:
+            assert before.rindex("if [ ! -x") < before.rindex("fi"), name
