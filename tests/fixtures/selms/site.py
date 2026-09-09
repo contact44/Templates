@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -69,6 +70,7 @@ def excel(query: dict) -> bytes:
 
 class Handler(BaseHTTPRequestHandler):
     seen: list[str] = []
+    search_delay = 0.0       # seconds the Search takes to answer, as it would on the intranet
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -76,7 +78,10 @@ class Handler(BaseHTTPRequestHandler):
         if url.path in PAGES:
             body, kind = PAGES[url.path].encode(), "text/html; charset=utf-8"
         elif url.path == "/contract/myContract.do":
-            body, kind = my_contract(parse_qs(url.query)).encode(), "text/html; charset=utf-8"
+            query = parse_qs(url.query)
+            if "search" in query:
+                time.sleep(Handler.search_delay)
+            body, kind = my_contract(query).encode(), "text/html; charset=utf-8"
         elif url.path == "/contract/excelDownload.do":
             body, kind = excel(parse_qs(url.query)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             self.send_response(200)

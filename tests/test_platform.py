@@ -16,6 +16,20 @@ from pulsar.scheduler import validate_cron
 from pulsar.stats import dashboard, day_bars, sparkline
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _chromium_runs() -> bool:
+    """Whether Playwright can actually start a browser here: installed is not the same as runnable."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return False
+    try:
+        with sync_playwright() as p:
+            p.chromium.launch(headless=True).close()
+            return True
+    except Exception:
+        return False
 from pulsar.vault import Vault, mask
 
 DEPOSIT = '''
@@ -228,15 +242,19 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
     """The seven steps of the SELMS+ sheet, on a stand-in site: sign-in, menu, filters, search, download, check."""
     pytest.importorskip("playwright.sync_api")
     pytest.importorskip("openpyxl")
+    browser = os.environ.get("PULSAR_TEST_BROWSER", "")
+    if not browser and not _chromium_runs():
+        pytest.skip("no browser for Playwright: run `playwright install chromium`, or set PULSAR_TEST_BROWSER")
     from tests.fixtures.selms.site import Handler, start
 
     server, base = start()
+    Handler.search_delay = 1.5      # a search slower than the pauses of the scenario: the export must wait for it
     try:
         shutil.copy(ROOT / "scenarios" / "selms_extraction.py", settings.scenarios_dir / "selms_extraction.py")
         platform = Platform(settings)
         platform.db.save_config("selms_extraction", True, None, {
             "url": base + "/secfw/ssoCheck.do", "browser": "chromium", "headless": True, "send_email": False,
-            "browser_path": os.environ.get("PULSAR_TEST_BROWSER", ""),
+            "browser_path": browser,
             "browser_profile": str(tmp_path / "profile"), "start_date": "2016-01-01", "closed": "N", "screenshots": True})
         run = platform.runner.execute(platform.db.create_run("selms_extraction", "cli"))
         logs = "\n".join(l["message"] for l in platform.db.logs(run["id"]))
@@ -252,4 +270,5 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
         assert any(p.suffix == ".xlsx" for p in outputs) and sum(p.suffix == ".png" for p in outputs) == 6
         platform.db.close()
     finally:
+        Handler.search_delay = 0.0
         server.shutdown()

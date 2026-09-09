@@ -240,7 +240,9 @@ table.t td.actions form{display:inline}
    figures in a second column, so the whole team and its numbers fit on one screen */
 .cockpit{display:grid;grid-template-columns:minmax(0,1fr) 250px 210px;gap:12px;align-items:start;margin-bottom:18px}
 .cockpit .openspace-panel{align-self:start}
-.cockpit-team{display:grid;gap:10px;min-width:0}
+.cockpit-team{display:grid;gap:10px;min-width:0;align-content:start}
+.cockpit-team #queue{min-width:0}
+.cockpit-team .pill{white-space:normal;text-align:left}
 .cockpit .team{grid-template-columns:1fr}
 .cockpit .member{grid-template-columns:44px 1fr;padding:10px}
 .cockpit .member .who{display:grid;gap:2px}
@@ -250,9 +252,11 @@ table.t td.actions form{display:inline}
 .cockpit .tile{padding:12px 14px}
 .cockpit .tile .v{font-size:1.5rem}
 .cockpit .tile.hero .v{font-size:2.1rem}
+/* the illustration never grows past its column: on a narrower screen it must shrink, not take the room the
+   figures gave back */
+.cockpit .openspace-panel{max-width:660px}
 @media (max-width:1100px){
-  .cockpit{grid-template-columns:minmax(0,1fr) 230px}
-  .cockpit .tiles{grid-column:1/3;grid-template-columns:repeat(4,1fr)}
+  .cockpit{grid-template-columns:minmax(0,1fr) 210px 190px}
 }
 @media (max-width:900px){
   .cockpit{grid-template-columns:1fr}
@@ -642,6 +646,7 @@ PARAMS = [
 ]
 
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
+SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
 DOWNLOAD_TIMEOUT = 180   # seconds for SELMS+ to produce the Excel file
 
@@ -676,7 +681,9 @@ def find_clickable(page, text: str, timeout: float = FIND_TIMEOUT):
     deadline = time.monotonic() + timeout
     while True:
         for build in builders:
-            loc = _everywhere(page, build)
+            # visible only: a submenu entry hidden under display:none counts as present otherwise, and the robot then
+            # clicks something nobody can see instead of opening the menu first
+            loc = _everywhere(page, lambda frame, b=build: b(frame).locator(&#34;visible=true&#34;))
             if loc is not None:
                 return loc
         if time.monotonic() &gt; deadline:
@@ -737,15 +744,20 @@ def open_browser(playwright, profile: Path, browser: str, headless: bool, execut
 # ---- the email -------------------------------------------------------------------------------------------------------
 
 def send_with_outlook(recipients: str, subject: str, body: str, attachment: Path) -&gt; None:
-    import win32com.client  # pywin32, Windows only
+    import pythoncom          # pywin32, Windows only
+    import win32com.client
 
-    outlook = win32com.client.Dispatch(&#34;Outlook.Application&#34;)
-    mail = outlook.CreateItem(0)
-    mail.To = recipients
-    mail.Subject = subject
-    mail.Body = body
-    mail.Attachments.Add(str(attachment))
-    mail.Send()
+    pythoncom.CoInitialize()  # the robot runs on a worker thread: COM must be set up on it before Outlook answers
+    try:
+        outlook = win32com.client.Dispatch(&#34;Outlook.Application&#34;)
+        mail = outlook.CreateItem(0)
+        mail.To = recipients
+        mail.Subject = subject
+        mail.Body = body
+        mail.Attachments.Add(str(attachment.resolve()))
+        mail.Send()
+    finally:
+        pythoncom.CoUninitialize()
 
 
 def send_with_smtp(ctx, recipients: str, subject: str, body: str, attachment: Path) -&gt; None:
@@ -842,8 +854,19 @@ def run(ctx):
                 ctx.task_done()
 
             with ctx.step(&#34;web.browse&#34;, &#34;Searching&#34;):
-                click(ctx, page, &#34;Search&#34;)
-                page.wait_for_load_state(&#34;networkidle&#34;)
+                # The results must be there before the export is asked for. page.wait_for_load_state() only watches the
+                # main document: when the form lives in a frame, as on SELMS+, it returns at once and the robot would
+                # click &#34;Excel Download&#34; on the page as it was before the search, exporting the unfiltered list. So the
+                # search request itself is awaited, then each frame that reloaded.
+                is_search = lambda request: request.resource_type in (&#34;document&#34;, &#34;xhr&#34;, &#34;fetch&#34;)
+                with page.expect_request_finished(is_search, timeout=SEARCH_TIMEOUT * 1000):
+                    click(ctx, page, &#34;Search&#34;)
+                for frame in page.frames:
+                    try:
+                        frame.wait_for_load_state(&#34;domcontentloaded&#34;)
+                    except Exception:            # that frame was replaced while the results came in
+                        pass
+                page.wait_for_timeout(600)
                 shot(page, &#34;results&#34;)
                 ctx.task_done()
 
@@ -913,7 +936,7 @@ def count_rows(path: Path) -&gt; int:
       <div class="panel-head"><h2>Checks</h2><span class="pill success"><i class="dot"></i>ready to save</span></div>
       
       <ul class="checks"><li class="ok"><i></i>Valid Python syntax</li><li class="ok"><i></i>Contract met: KEY &#39;selms_extraction_v2&#39;, NAME, run(ctx), 12 parameters</li><li class="ok"><i></i>Key &#39;selms_extraction_v2&#39; is available</li><li class="ok"><i></i>Schedule &#39;0 7 28 * *&#39; is valid</li><li class="ok"><i></i>5 declared actions: web.browse, doc.fill, doc.read, verify, send</li><li class="warn"><i></i>Network or system access: playwright, smtplib, win32com</li><li class="warn"><i></i>Possible outbound send without ctx.propose: make sure a human validation is planned</li><li class="ok"><i></i>Uses credentials from the vault (ctx.credentials)</li></ul>
-      <dl class="facts compact"><div><dt>Key</dt><dd class="mono">selms_extraction_v2</dd></div><div><dt>Name</dt><dd>SELMS+ Excel download (trial)</dd></div><div><dt>Schedule</dt><dd>0 7 28 * *</dd></div><div><dt>Imports</dt><dd class="mono">__future__, calendar, datetime, email, openpyxl, pathlib, playwright, re, smtplib, sys, time, win32com</dd></div></dl>
+      <dl class="facts compact"><div><dt>Key</dt><dd class="mono">selms_extraction_v2</dd></div><div><dt>Name</dt><dd>SELMS+ Excel download (trial)</dd></div><div><dt>Schedule</dt><dd>0 7 28 * *</dd></div><div><dt>Imports</dt><dd class="mono">__future__, calendar, datetime, email, openpyxl, pathlib, playwright, pythoncom, re, smtplib, sys, time, win32com</dd></div></dl>
       
       <h3>Contract reminder</h3>
       <pre class="contract">KEY = "unique_key"             # letters, digits, _ -
@@ -1074,6 +1097,7 @@ PARAMS = [
 ]
 
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
+SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
 DOWNLOAD_TIMEOUT = 180   # seconds for SELMS+ to produce the Excel file
 
@@ -1108,7 +1132,9 @@ def find_clickable(page, text: str, timeout: float = FIND_TIMEOUT):
     deadline = time.monotonic() + timeout
     while True:
         for build in builders:
-            loc = _everywhere(page, build)
+            # visible only: a submenu entry hidden under display:none counts as present otherwise, and the robot then
+            # clicks something nobody can see instead of opening the menu first
+            loc = _everywhere(page, lambda frame, b=build: b(frame).locator(&#34;visible=true&#34;))
             if loc is not None:
                 return loc
         if time.monotonic() &gt; deadline:
@@ -1169,15 +1195,20 @@ def open_browser(playwright, profile: Path, browser: str, headless: bool, execut
 # ---- the email -------------------------------------------------------------------------------------------------------
 
 def send_with_outlook(recipients: str, subject: str, body: str, attachment: Path) -&gt; None:
-    import win32com.client  # pywin32, Windows only
+    import pythoncom          # pywin32, Windows only
+    import win32com.client
 
-    outlook = win32com.client.Dispatch(&#34;Outlook.Application&#34;)
-    mail = outlook.CreateItem(0)
-    mail.To = recipients
-    mail.Subject = subject
-    mail.Body = body
-    mail.Attachments.Add(str(attachment))
-    mail.Send()
+    pythoncom.CoInitialize()  # the robot runs on a worker thread: COM must be set up on it before Outlook answers
+    try:
+        outlook = win32com.client.Dispatch(&#34;Outlook.Application&#34;)
+        mail = outlook.CreateItem(0)
+        mail.To = recipients
+        mail.Subject = subject
+        mail.Body = body
+        mail.Attachments.Add(str(attachment.resolve()))
+        mail.Send()
+    finally:
+        pythoncom.CoUninitialize()
 
 
 def send_with_smtp(ctx, recipients: str, subject: str, body: str, attachment: Path) -&gt; None:
@@ -1274,8 +1305,19 @@ def run(ctx):
                 ctx.task_done()
 
             with ctx.step(&#34;web.browse&#34;, &#34;Searching&#34;):
-                click(ctx, page, &#34;Search&#34;)
-                page.wait_for_load_state(&#34;networkidle&#34;)
+                # The results must be there before the export is asked for. page.wait_for_load_state() only watches the
+                # main document: when the form lives in a frame, as on SELMS+, it returns at once and the robot would
+                # click &#34;Excel Download&#34; on the page as it was before the search, exporting the unfiltered list. So the
+                # search request itself is awaited, then each frame that reloaded.
+                is_search = lambda request: request.resource_type in (&#34;document&#34;, &#34;xhr&#34;, &#34;fetch&#34;)
+                with page.expect_request_finished(is_search, timeout=SEARCH_TIMEOUT * 1000):
+                    click(ctx, page, &#34;Search&#34;)
+                for frame in page.frames:
+                    try:
+                        frame.wait_for_load_state(&#34;domcontentloaded&#34;)
+                    except Exception:            # that frame was replaced while the results came in
+                        pass
+                page.wait_for_timeout(600)
                 shot(page, &#34;results&#34;)
                 ctx.task_done()
 

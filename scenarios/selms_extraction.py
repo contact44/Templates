@@ -58,6 +58,7 @@ PARAMS = [
 ]
 
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
+SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
 DOWNLOAD_TIMEOUT = 180   # seconds for SELMS+ to produce the Excel file
 
@@ -92,7 +93,9 @@ def find_clickable(page, text: str, timeout: float = FIND_TIMEOUT):
     deadline = time.monotonic() + timeout
     while True:
         for build in builders:
-            loc = _everywhere(page, build)
+            # visible only: a submenu entry hidden under display:none counts as present otherwise, and the robot then
+            # clicks something nobody can see instead of opening the menu first
+            loc = _everywhere(page, lambda frame, b=build: b(frame).locator("visible=true"))
             if loc is not None:
                 return loc
         if time.monotonic() > deadline:
@@ -263,8 +266,19 @@ def run(ctx):
                 ctx.task_done()
 
             with ctx.step("web.browse", "Searching"):
-                click(ctx, page, "Search")
-                page.wait_for_load_state("networkidle")
+                # The results must be there before the export is asked for. page.wait_for_load_state() only watches the
+                # main document: when the form lives in a frame, as on SELMS+, it returns at once and the robot would
+                # click "Excel Download" on the page as it was before the search, exporting the unfiltered list. So the
+                # search request itself is awaited, then each frame that reloaded.
+                is_search = lambda request: request.resource_type in ("document", "xhr", "fetch")
+                with page.expect_request_finished(is_search, timeout=SEARCH_TIMEOUT * 1000):
+                    click(ctx, page, "Search")
+                for frame in page.frames:
+                    try:
+                        frame.wait_for_load_state("domcontentloaded")
+                    except Exception:            # that frame was replaced while the results came in
+                        pass
+                page.wait_for_timeout(600)
                 shot(page, "results")
                 ctx.task_done()
 

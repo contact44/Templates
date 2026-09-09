@@ -232,7 +232,9 @@ table.t td.actions form{display:inline}
    figures in a second column, so the whole team and its numbers fit on one screen */
 .cockpit{display:grid;grid-template-columns:minmax(0,1fr) 250px 210px;gap:12px;align-items:start;margin-bottom:18px}
 .cockpit .openspace-panel{align-self:start}
-.cockpit-team{display:grid;gap:10px;min-width:0}
+.cockpit-team{display:grid;gap:10px;min-width:0;align-content:start}
+.cockpit-team #queue{min-width:0}
+.cockpit-team .pill{white-space:normal;text-align:left}
 .cockpit .team{grid-template-columns:1fr}
 .cockpit .member{grid-template-columns:44px 1fr;padding:10px}
 .cockpit .member .who{display:grid;gap:2px}
@@ -242,9 +244,11 @@ table.t td.actions form{display:inline}
 .cockpit .tile{padding:12px 14px}
 .cockpit .tile .v{font-size:1.5rem}
 .cockpit .tile.hero .v{font-size:2.1rem}
+/* the illustration never grows past its column: on a narrower screen it must shrink, not take the room the
+   figures gave back */
+.cockpit .openspace-panel{max-width:660px}
 @media (max-width:1100px){
-  .cockpit{grid-template-columns:minmax(0,1fr) 230px}
-  .cockpit .tiles{grid-column:1/3;grid-template-columns:repeat(4,1fr)}
+  .cockpit{grid-template-columns:minmax(0,1fr) 210px 190px}
 }
 @media (max-width:900px){
   .cockpit{grid-template-columns:1fr}
