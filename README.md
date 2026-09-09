@@ -73,6 +73,23 @@ Action catalogue: `mail.read`, `mail.reply`, `doc.read`, `doc.fill`, `web.browse
 `send`, `archive`, `wait`. An uncaught exception marks the run as failed, with the faulty action and the
 trace in the journal.
 
+## The SELMS+ scenario
+
+`scenarios/selms_extraction.py` is the "SELMS+ Automation, Scheduled Excel Download" sheet of Legal Operations,
+step by step: open the SSO check page, Confirm, Contract Mgmt. then My Contract, Request Date from 01/01/2016 to
+the end of the current month with Closed = N, Search, Excel Download, then the file by email. It drives Microsoft
+Edge through Playwright with a browser profile kept in the workspace, so the Samsung SSO session survives between
+runs; the email leaves through Outlook on the machine. On the workstation that will run it:
+
+```bash
+pip install -e .[rpa]           # Playwright, openpyxl, pywin32
+```
+
+Enable the scenario, keep "Hide the browser window" off and run it once by hand: if SSO asks for a sign-in, do it
+in the Edge window that opened, the robot waits and carries on. Every step leaves a screenshot in
+`workspace/outputs/selms_extraction/`, which is where to look if the site has moved something. The scenario is
+tested end to end on a stand-in of the four SELMS+ screens (`tests/fixtures/selms/`).
+
 ## Sharing it with the team
 
 Pulsar is already a web server, so one machine can serve the whole department: run it on the workstation that
@@ -111,7 +128,7 @@ server. `.github/workflows/preview.yml` rebuilds and publishes it on GitHub Page
 ```
 pulsar/         core: app.py (routes), db.py, registry.py, runner.py, team.py, scheduler.py, vault.py, stats.py, templates/, static/
 tools/          build_preview.py (the published page) and the open space artwork scripts
-scenarios/      scenarios shipped with the code (two demos + the SELMS+ extraction skeleton)
+scenarios/      scenarios shipped with the code (two demos + the SELMS+ Excel download)
 workspace/      local data, outside git: pulsar.db, deposited scenarios and their versions, outputs/, vault
 start.bat       one-click start on Windows; start.sh does the same on macOS and Linux
 tests/          pytest

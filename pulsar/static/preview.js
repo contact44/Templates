@@ -15,11 +15,15 @@ window.PulsarPreview = (function () {
       {kind: "mail.read", label: "Reading the demonstration mailbox"},
       {kind: "doc.read", label: "Processing the fictitious batch"},
       {kind: "archive", label: "Filing the results"}]},
-    {key: "selms_extraction", name: "Monthly SELMS+ extraction", steps: [
-      {kind: "web.browse", label: "Signing in to SELMS+"},
-      {kind: "web.browse", label: "Filtering and exporting"},
+    {key: "selms_extraction", name: "SELMS+ Excel download", steps: [
+      {kind: "web.browse", label: "Opening SELMS+"},
+      {kind: "web.browse", label: "Confirming the sign-in"},
+      {kind: "web.browse", label: "Opening My Contract"},
+      {kind: "doc.fill", label: "Setting the filters"},
+      {kind: "web.browse", label: "Searching"},
+      {kind: "doc.read", label: "Downloading the Excel export"},
       {kind: "verify", label: "Checking the file"},
-      {kind: "archive", label: "Filing in the shared folder"}]}
+      {kind: "send", label: "Sending the file by email"}]}
   ];
 
   var runs = {}, events = [], nextRunId = 300, busy = {}, runningKeyOf = {};
