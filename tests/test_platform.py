@@ -253,6 +253,7 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
         shutil.copy(ROOT / "scenarios" / "selms_extraction.py", settings.scenarios_dir / "selms_extraction.py")
         platform = Platform(settings)
         platform.db.save_config("selms_extraction", True, None, {
+            "portal_url": base + "/portalapp/home", "portal_link": "SELMS+",
             "url": base + "/secfw/ssoCheck.do", "browser": "chromium", "headless": True, "send_email": False,
             "browser_path": browser,
             "browser_profile": str(tmp_path / "profile"), "start_date": "2016-01-01", "closed": "N", "screenshots": True})
@@ -260,14 +261,15 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
         logs = "\n".join(l["message"] for l in platform.db.logs(run["id"]))
         assert run["status"] == dbm.STATUS_SUCCESS, logs
         assert [s["label"] for s in platform.db.steps(run["id"])] == [
-            "Opening SELMS+", "Confirming the sign-in", "Opening My Contract", "Setting the filters", "Searching",
-            "Downloading the Excel export", "Checking the file", "Sending the file by email"]
-        assert run["items"] == 7 and run["metrics"]["contracts"] == 3       # the three open contracts since 2016
+            "Opening the Knox portal", "Opening SELMS+ from the portal", "Confirming the sign-in", "Opening My Contract",
+            "Setting the filters", "Searching", "Downloading the Excel export", "Checking the file",
+            "Sending the file by email"]
+        assert run["items"] == 8 and run["metrics"]["contracts"] == 3       # the three open contracts since 2016
         durations = {s["label"]: s["duration_ms"] for s in platform.db.steps(run["id"])}
         assert max(durations.values()) < 30000, durations                   # no step waits on a timeout
         assert any("closed=N" in p and "start=2016-01-01" in p for p in Handler.seen if "excelDownload" in p)
         outputs = list((settings.workspace / "outputs" / "selms_extraction").glob("*"))
-        assert any(p.suffix == ".xlsx" for p in outputs) and sum(p.suffix == ".png" for p in outputs) == 6
+        assert any(p.suffix == ".xlsx" for p in outputs) and sum(p.suffix == ".png" for p in outputs) == 7
         platform.db.close()
     finally:
         Handler.search_delay = 0.0
