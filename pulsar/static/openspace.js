@@ -390,16 +390,35 @@ window.Openspace = (function () {
     // the plates over the head carry that information alone
   };
 
+  // Action sentences are long and the robots often stand close, so the plates need room made for them: each one gets
+  // the width its neighbours leave, and a robot standing in front of another has its plates lifted above them.
+  var PLATE_H = 9, PLATE_REACH = 34;
+  Scene.prototype.plateBox = function (r) {
+    var room = 148, lift = 0;
+    for (var i = 0; i < this.robots.length; i++) {
+      var other = this.robots[i];
+      if (other === r || Math.abs(other.y - r.y) > PLATE_REACH) continue;
+      var gap = Math.abs(other.x - r.x);
+      if (gap > 150) continue;
+      room = Math.min(room, Math.max(30, gap - 6));
+      // same band and closer to the viewer: stack this robot's plates over that one's instead of across them
+      if (gap < 62 && (other.y < r.y || (other.y === r.y && other.index < r.index))) lift += 2 * PLATE_H;
+    }
+    return { room: room, lift: lift };
+  };
+
   Scene.prototype.drawPlates = function (r) {
     // like a game: the name floats over the head, the current action above it
     var ctx = this.ctx, x = Math.round(r.x), y = Math.round(r.y), sheet = this.sheets[r.index % Math.max(1, this.sheets.length)];
     var fr = sheet && sheet.frames[poseFor(r).name], top = y - (fr ? fr.h : 38);
+    var box = this.plateBox(r), top2 = top - box.lift;
     var name = r.name || ("ROBOT " + (r.index + 1)), nw = textWidth(name);
-    plate(ctx, name, Math.max(2, Math.min(W - nw - 4, x - nw / 2)), top - 10, C.w, r.busy ? C.blue : C.plate);
+    plate(ctx, name, Math.max(2, Math.min(W - nw - 4, x - nw / 2)), top2 - 10, C.w, r.busy ? C.blue : C.plate);
     // the current task in words ("Signing in to SELMS+"), or "Ready to work" in green
     var text = r.busy ? actionText(r) : (r.moving ? "" : "Ready to work");
-    if (text) { var w = Math.min(textWidth(text), 140); plate(ctx, text, Math.max(2, Math.min(W - w - 4, x - w / 2)), top - 19, r.busy ? C.neon : C.green, "rgba(11,18,32,.92)", 140); }
-    if (r.fresh && r.freshUntil > Date.now() && ICONS[r.fresh]) { drawSprite(ctx, BUBBLE, x + 8, top - 33, { k: C.k, w: C.w }); drawSprite(ctx, ICONS[r.fresh], x + 12, top - 31, { g: C.green, a: C.amber, r: C.red }); }
+    if (text) { var w = Math.min(textWidth(text), box.room);
+      plate(ctx, text, Math.max(2, Math.min(W - w - 4, x - w / 2)), top2 - 19, r.busy ? C.neon : C.green, "rgba(11,18,32,.92)", box.room); }
+    if (r.fresh && r.freshUntil > Date.now() && ICONS[r.fresh]) { drawSprite(ctx, BUBBLE, x + 8, top2 - 33, { k: C.k, w: C.w }); drawSprite(ctx, ICONS[r.fresh], x + 12, top2 - 31, { g: C.green, a: C.amber, r: C.red }); }
   };
 
   Scene.prototype.renderDom = function () {
