@@ -81,6 +81,10 @@ PARAMS = [
 FIND_TIMEOUT = 25        # seconds to find a button or a field once the page is there
 SEARCH_TIMEOUT = 120     # seconds for SELMS+ to answer the Search: ten years of contracts can take a while
 SSO_WAIT = 180           # seconds granted to a human sign-in in the browser window when SSO asks for it
+MISSING = ('{what} is not installed on this machine. Close the platform and start it again with start.bat: it '
+           'checks the installation on every run and brings in what is missing. To do it by hand instead, from the '
+           'folder of the platform: .venv\\Scripts\\python.exe -m pip install -e ".[rpa]"  (the quotes matter in '
+           'PowerShell).')
 
 
 # ---- reading a label as these screens write it -------------------------------------------------------------------
@@ -451,12 +455,12 @@ def open_session(ctx) -> Session:
         try:
             return PlaywrightSession(profile, ctx.params["headless"], ctx.params["browser_path"])
         except ImportError:
-            raise RuntimeError("Playwright is not installed: run  pip install -e .[rpa]") from None
+            raise RuntimeError(MISSING.format(what="Playwright")) from None
     try:
         return SeleniumSession(kind, profile, ctx.params["headless"], ctx.params["browser_path"],
                                ctx.params["ie_driver_path"])
     except ImportError:
-        raise RuntimeError("Selenium is not installed: run  pip install -e .[rpa]") from None
+        raise RuntimeError(MISSING.format(what="Selenium")) from None
     except Exception as error:
         if kind == "edge_ie":
             raise RuntimeError(
@@ -641,7 +645,8 @@ def run(ctx):
                 ctx.task_done()
                 return
             except ImportError:
-                ctx.warn("pywin32 is not installed, Outlook cannot be used: run  pip install -e .[rpa]")
+                ctx.warn("pywin32 is not installed, so Outlook cannot be used. Start the platform again with "
+                         "start.bat, which checks the installation.")
             except Exception as error:
                 ctx.warn(f"Outlook could not send the email: {error}")
         if ctx.params["smtp_host"].strip():

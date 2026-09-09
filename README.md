@@ -8,7 +8,8 @@ dashboard. One Python process, one SQLite database, one browser. No server, no c
 
 Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run installs the platform
 and everything the robots need to drive a browser and read an Excel file, which takes a few minutes; every later
-run starts in seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed,
+run checks that installation in a couple of seconds, so a new version of the platform brings in what it needs by
+simply being started, then opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed,
 with "Add python.exe to PATH" ticked.
 
 By hand, if you prefer:
