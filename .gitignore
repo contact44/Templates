@@ -7,3 +7,7 @@ workspace/*
 !workspace/.gitkeep
 docs/.preview-workspace/
 _site/
+build/
+dist/
+*.spec.bak
+'Pulsar data'/

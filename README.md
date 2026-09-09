@@ -6,9 +6,17 @@ dashboard. One Python process, one SQLite database, one browser. No server, no c
 
 ## Getting started
 
-Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run prepares the
-environment and fills the dashboard with fictitious data, which takes a few minutes; every later run starts in
-seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed.
+**With the executable.** `Pulsar.exe` is the platform as one file: double-click it and it starts, opens the
+browser and keeps running until you close its window. Nothing to install, not even Python. It writes its data to
+a `Pulsar data` folder next to itself, so keep the two together and copy them wherever you like.
+
+To obtain it, either download it from the repository (Actions tab, the "Windows executable" workflow, then
+Artifacts; a release is published for every version tag), or build it on the PC by double-clicking `build-exe.bat`,
+which needs Python once and leaves the result in `dist\Pulsar.exe`. The recipe is `tools/pulsar.spec`.
+
+**From the sources.** Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run
+prepares the environment and fills the dashboard with fictitious data, which takes a few minutes; every later run
+starts in seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed.
 
 By hand, if you prefer:
 
@@ -85,8 +93,9 @@ runs; the email leaves through Outlook on the machine. On the workstation that w
 pip install -e .[rpa]           # Playwright, openpyxl, pywin32
 ```
 
-Enable the scenario, keep "Hide the browser window" off and run it once by hand: if SSO asks for a sign-in, do it
-in the Edge window that opened, the robot waits and carries on. Every step leaves a screenshot in
+Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
+asks for a sign-in you do it in that window, the robot waits and carries on. Once the session is remembered you
+can turn Headless on, and the scheduled runs happen in the background with no window at all. Every step leaves a screenshot in
 `workspace/outputs/selms_extraction/`, which is where to look if the site has moved something. The scenario is
 tested end to end on a stand-in of the four SELMS+ screens (`tests/fixtures/selms/`).
 
@@ -131,6 +140,7 @@ tools/          build_preview.py (the published page) and the open space artwork
 scenarios/      scenarios shipped with the code (two demos + the SELMS+ Excel download)
 workspace/      local data, outside git: pulsar.db, deposited scenarios and their versions, outputs/, vault
 start.bat       one-click start on Windows; start.sh does the same on macOS and Linux
+build-exe.bat   builds Pulsar.exe, the platform as a single file (recipe: tools/pulsar.spec)
 tests/          pytest
 docs/           framing and decisions; docs/preview/ holds the published page
 .github/        the workflow that publishes the preview on GitHub Pages

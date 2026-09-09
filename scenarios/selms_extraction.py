@@ -46,8 +46,10 @@ PARAMS = [
      "help": "Edge is the one signed in to Samsung SSO on a Samsung PC."},
     {"name": "browser_path", "label": "Browser executable (optional)", "type": "str", "default": "",
      "help": "Only when the browser is not found by itself, e.g. C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"},
-    {"name": "headless", "label": "Hide the browser window", "type": "bool", "default": False,
-     "help": "Keep it visible the first time: the SSO sign-in may have to be done by hand in that window."},
+    {"name": "headless", "label": "Headless: run in the background, with no browser window", "type": "bool", "default": False,
+     "help": "No means the browser window is visible and you can watch the robot work; it is also the only way to sign in "
+             "to SSO by hand the first time. Yes means the run happens in the background, which is what a scheduled run "
+             "should do once the sign-in is remembered."},
     {"name": "browser_profile", "label": "Browser profile folder", "type": "str", "default": "browser/selms",
      "help": "Relative to the workspace. Keeps the SSO session between runs."},
     {"name": "send_email", "label": "Send the file by email", "type": "bool", "default": True},
@@ -224,8 +226,9 @@ def run(ctx):
                 confirm = find_clickable(page, "Confirm", timeout=8)
                 if confirm is None:
                     if ctx.params["headless"]:
-                        raise RuntimeError("SELMS+ did not show the Confirm button: the SSO session is probably gone. "
-                                           "Run once with the browser window visible and sign in by hand in it.")
+                        raise RuntimeError("SELMS+ did not show the Confirm button and the run is headless, so nobody can "
+                                           "sign in. Set Headless to no, run once and sign in to SSO in the window that "
+                                           "opens; the session is then remembered and headless runs work again.")
                     ctx.warn(f"SSO is asking for a sign-in: waiting up to {SSO_WAIT} s for it to be done in the browser window")
                     confirm = find_clickable(page, "Confirm", timeout=SSO_WAIT)
                     if confirm is None:

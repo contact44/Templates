@@ -634,8 +634,10 @@ PARAMS = [
      &#34;help&#34;: &#34;Edge is the one signed in to Samsung SSO on a Samsung PC.&#34;},
     {&#34;name&#34;: &#34;browser_path&#34;, &#34;label&#34;: &#34;Browser executable (optional)&#34;, &#34;type&#34;: &#34;str&#34;, &#34;default&#34;: &#34;&#34;,
      &#34;help&#34;: &#34;Only when the browser is not found by itself, e.g. C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe&#34;},
-    {&#34;name&#34;: &#34;headless&#34;, &#34;label&#34;: &#34;Hide the browser window&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: False,
-     &#34;help&#34;: &#34;Keep it visible the first time: the SSO sign-in may have to be done by hand in that window.&#34;},
+    {&#34;name&#34;: &#34;headless&#34;, &#34;label&#34;: &#34;Headless: run in the background, with no browser window&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: False,
+     &#34;help&#34;: &#34;No means the browser window is visible and you can watch the robot work; it is also the only way to sign in &#34;
+             &#34;to SSO by hand the first time. Yes means the run happens in the background, which is what a scheduled run &#34;
+             &#34;should do once the sign-in is remembered.&#34;},
     {&#34;name&#34;: &#34;browser_profile&#34;, &#34;label&#34;: &#34;Browser profile folder&#34;, &#34;type&#34;: &#34;str&#34;, &#34;default&#34;: &#34;browser/selms&#34;,
      &#34;help&#34;: &#34;Relative to the workspace. Keeps the SSO session between runs.&#34;},
     {&#34;name&#34;: &#34;send_email&#34;, &#34;label&#34;: &#34;Send the file by email&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: True},
@@ -812,8 +814,9 @@ def run(ctx):
                 confirm = find_clickable(page, &#34;Confirm&#34;, timeout=8)
                 if confirm is None:
                     if ctx.params[&#34;headless&#34;]:
-                        raise RuntimeError(&#34;SELMS+ did not show the Confirm button: the SSO session is probably gone. &#34;
-                                           &#34;Run once with the browser window visible and sign in by hand in it.&#34;)
+                        raise RuntimeError(&#34;SELMS+ did not show the Confirm button and the run is headless, so nobody can &#34;
+                                           &#34;sign in. Set Headless to no, run once and sign in to SSO in the window that &#34;
+                                           &#34;opens; the session is then remembered and headless runs work again.&#34;)
                     ctx.warn(f&#34;SSO is asking for a sign-in: waiting up to {SSO_WAIT} s for it to be done in the browser window&#34;)
                     confirm = find_clickable(page, &#34;Confirm&#34;, timeout=SSO_WAIT)
                     if confirm is None:
@@ -1000,7 +1003,7 @@ def run(ctx):
       
         <label>Browser executable (optional)<input type="text"  name="browser_path" value=""><span class="help">Only when the browser is not found by itself, e.g. C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</span></label>
       
-        <label class="check"><input type="checkbox" name="headless" > Hide the browser window<span class="help">Keep it visible the first time: the SSO sign-in may have to be done by hand in that window.</span></label>
+        <label class="check"><input type="checkbox" name="headless" > Headless: run in the background, with no browser window<span class="help">No means the browser window is visible and you can watch the robot work; it is also the only way to sign in to SSO by hand the first time. Yes means the run happens in the background, which is what a scheduled run should do once the sign-in is remembered.</span></label>
         
       
         <label>Browser profile folder<input type="text"  name="browser_profile" value="browser/selms"><span class="help">Relative to the workspace. Keeps the SSO session between runs.</span></label>
@@ -1085,8 +1088,10 @@ PARAMS = [
      &#34;help&#34;: &#34;Edge is the one signed in to Samsung SSO on a Samsung PC.&#34;},
     {&#34;name&#34;: &#34;browser_path&#34;, &#34;label&#34;: &#34;Browser executable (optional)&#34;, &#34;type&#34;: &#34;str&#34;, &#34;default&#34;: &#34;&#34;,
      &#34;help&#34;: &#34;Only when the browser is not found by itself, e.g. C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe&#34;},
-    {&#34;name&#34;: &#34;headless&#34;, &#34;label&#34;: &#34;Hide the browser window&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: False,
-     &#34;help&#34;: &#34;Keep it visible the first time: the SSO sign-in may have to be done by hand in that window.&#34;},
+    {&#34;name&#34;: &#34;headless&#34;, &#34;label&#34;: &#34;Headless: run in the background, with no browser window&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: False,
+     &#34;help&#34;: &#34;No means the browser window is visible and you can watch the robot work; it is also the only way to sign in &#34;
+             &#34;to SSO by hand the first time. Yes means the run happens in the background, which is what a scheduled run &#34;
+             &#34;should do once the sign-in is remembered.&#34;},
     {&#34;name&#34;: &#34;browser_profile&#34;, &#34;label&#34;: &#34;Browser profile folder&#34;, &#34;type&#34;: &#34;str&#34;, &#34;default&#34;: &#34;browser/selms&#34;,
      &#34;help&#34;: &#34;Relative to the workspace. Keeps the SSO session between runs.&#34;},
     {&#34;name&#34;: &#34;send_email&#34;, &#34;label&#34;: &#34;Send the file by email&#34;, &#34;type&#34;: &#34;bool&#34;, &#34;default&#34;: True},
@@ -1263,8 +1268,9 @@ def run(ctx):
                 confirm = find_clickable(page, &#34;Confirm&#34;, timeout=8)
                 if confirm is None:
                     if ctx.params[&#34;headless&#34;]:
-                        raise RuntimeError(&#34;SELMS+ did not show the Confirm button: the SSO session is probably gone. &#34;
-                                           &#34;Run once with the browser window visible and sign in by hand in it.&#34;)
+                        raise RuntimeError(&#34;SELMS+ did not show the Confirm button and the run is headless, so nobody can &#34;
+                                           &#34;sign in. Set Headless to no, run once and sign in to SSO in the window that &#34;
+                                           &#34;opens; the session is then remembered and headless runs work again.&#34;)
                     ctx.warn(f&#34;SSO is asking for a sign-in: waiting up to {SSO_WAIT} s for it to be done in the browser window&#34;)
                     confirm = find_clickable(page, &#34;Confirm&#34;, timeout=SSO_WAIT)
                     if confirm is None:
