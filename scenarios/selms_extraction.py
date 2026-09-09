@@ -1,7 +1,9 @@
 """SELMS+ automation: the scheduled Excel download of My Contract, sent by email.
 
 Written from the scenario sheet "SELMS+ Automation, Scheduled Excel Download" (Legal Operations, July 2026):
-    1. go to http://selmsplus.sec.samsung.net/secfw/ssoCheck.do
+    0. SELMS+ is not reachable by its address alone: the robot starts at the Knox portal
+       (http://w1.samsung.net/portalapp/home) and clicks "SELMS+" in the top menu, which is what opens the session
+    1. that lands on http://selmsplus.sec.samsung.net/secfw/ssoCheck.do
     2. click "Confirm"
     3. go to "Contract Mgmt." then "My Contract"
     4. set the filter: Request Date from 01/01/2016 to the end of the current month, Closed always "N"
@@ -37,7 +39,12 @@ DESCRIPTION = ("Signs in to SELMS+, opens My Contract, filters the requests from
 SCHEDULE = "0 7 28 * *"
 ENABLED_BY_DEFAULT = False
 PARAMS = [
-    {"name": "url", "label": "SELMS+ sign-in page", "type": "str", "default": "http://selmsplus.sec.samsung.net/secfw/ssoCheck.do"},
+    {"name": "portal_url", "label": "Portal to start from", "type": "str", "default": "http://w1.samsung.net/portalapp/home",
+     "help": "SELMS+ is opened from the Knox portal, not by its own address. Leave empty to go straight to the address below."},
+    {"name": "portal_link", "label": "Link to click in the portal menu", "type": "str", "default": "SELMS+",
+     "help": "As written in the top menu of the portal. Spaces do not matter."},
+    {"name": "url", "label": "SELMS+ address", "type": "str", "default": "http://selmsplus.sec.samsung.net/secfw/ssoCheck.do",
+     "help": "Used when no portal is set, and as the fallback if the link is not found in the menu."},
     {"name": "recipients", "label": "Send the file to", "type": "str", "default": "ca.amrat@partner.samsung.com",
      "help": "Several addresses separated by ; "},
     {"name": "start_date", "label": "Request Date, from", "type": "str", "default": "2016-01-01", "help": "Year-month-day. The end is always the last day of the current month."},
@@ -68,7 +75,11 @@ DOWNLOAD_TIMEOUT = 180   # seconds for SELMS+ to produce the Excel file
 # ---- finding things on the page, in frames too ----------------------------------------------------------------------
 
 def _exact(text: str) -> re.Pattern:
-    return re.compile(r"^\W*" + re.escape(text) + r"\W*$", re.I)
+    """The label as it is written, give or take the spacing and the decoration: intranet menus write "SELMS + " for
+    SELMS+ and separate their words with &nbsp;, and these forms print a bullet in front of every field name."""
+    gap = r"[\s\u00a0]*"
+    body = gap.join(re.escape(ch) for ch in text.strip() if not ch.isspace())
+    return re.compile(r"^\W*" + body + r"\W*$", re.I)     # \W* also lets through the bullets these forms print
 
 
 def _everywhere(page, build):
@@ -103,6 +114,28 @@ def find_clickable(page, text: str, timeout: float = FIND_TIMEOUT):
         if time.monotonic() > deadline:
             return None
         page.wait_for_timeout(500)
+
+
+def click_and_follow(context, page, text: str, timeout: float = FIND_TIMEOUT):
+    """Click something that may open the application in a new tab, and return the page to carry on with."""
+    loc = find_clickable(page, text, timeout)
+    if loc is None:
+        return None
+    before = set(context.pages)
+    loc.click()
+    for _ in range(20):                       # a portal link opens its tab in well under ten seconds
+        page.wait_for_timeout(500)
+        opened = [p for p in context.pages if p not in before]
+        if opened:
+            fresh = opened[-1]
+            fresh.wait_for_load_state("domcontentloaded")
+            fresh.bring_to_front()
+            return fresh
+        if page.url != "about:blank" and page.frames:
+            break
+    page.wait_for_load_state("domcontentloaded")
+    page.wait_for_timeout(600)
+    return page
 
 
 def click(ctx, page, text: str, timeout: float = FIND_TIMEOUT) -> None:
@@ -217,10 +250,28 @@ def run(ctx):
         try:
             page = context.pages[0] if context.pages else context.new_page()
 
-            with ctx.step("web.browse", "Opening SELMS+"):
-                page.goto(ctx.params["url"], wait_until="domcontentloaded")
-                shot(page, "sso_check")
-                ctx.task_done()
+            portal = ctx.params["portal_url"].strip()
+            if portal:
+                with ctx.step("web.browse", "Opening the Knox portal"):
+                    page.goto(portal, wait_until="domcontentloaded")
+                    page.wait_for_timeout(800)
+                    shot(page, "portal")
+                    ctx.task_done()
+
+                with ctx.step("web.browse", f"Opening {ctx.params['portal_link']} from the portal"):
+                    opened = click_and_follow(context, page, ctx.params["portal_link"])
+                    if opened is None:
+                        ctx.warn(f"\"{ctx.params['portal_link']}\" is not in the portal menu: going to {ctx.params['url']} instead")
+                        page.goto(ctx.params["url"], wait_until="domcontentloaded")
+                    else:
+                        page = opened
+                    shot(page, "sso_check")
+                    ctx.task_done()
+            else:
+                with ctx.step("web.browse", "Opening SELMS+"):
+                    page.goto(ctx.params["url"], wait_until="domcontentloaded")
+                    shot(page, "sso_check")
+                    ctx.task_done()
 
             with ctx.step("web.browse", "Confirming the sign-in"):
                 confirm = find_clickable(page, "Confirm", timeout=8)

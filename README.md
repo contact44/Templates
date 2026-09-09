@@ -76,8 +76,11 @@ trace in the journal.
 ## The SELMS+ scenario
 
 `scenarios/selms_extraction.py` is the "SELMS+ Automation, Scheduled Excel Download" sheet of Legal Operations,
-step by step: open the SSO check page, Confirm, Contract Mgmt. then My Contract, Request Date from 01/01/2016 to
-the end of the current month with Closed = N, Search, Excel Download, then the file by email. It drives Microsoft
+step by step. SELMS+ cannot be opened by its address alone, so the robot takes the same road as you do: the Knox
+portal at `http://w1.samsung.net/portalapp/home`, then "SELMS+" in the top menu, which opens the application in a
+new tab. From there: Confirm, Contract Mgmt. then My Contract, Request Date from 01/01/2016 to the end of the
+current month with Closed = N, Search, Excel Download, then the file by email. The portal address and the name of
+the link are parameters, so a menu that is renamed or a portal that moves is a field to edit, not code to change. It drives Microsoft
 Edge through Playwright with a browser profile kept in the workspace, so the Samsung SSO session survives between
 runs; the email leaves through Outlook on the machine. `start.bat` installs what it needs. Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
 asks for a sign-in you do it in that window, the robot waits and carries on. Once the session is remembered you

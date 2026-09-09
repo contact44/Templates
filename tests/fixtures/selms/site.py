@@ -1,6 +1,7 @@
-"""A stand-in for SELMS+, the four screens of the scenario sheet: the SSO check with its Confirm button, the menu
-"Contract Mgmt." with "My Contract", the My Contract filters (in a frame, as the real one), Search and Excel Download.
-Serves on a free local port; records what the robot sent so the test can check it."""
+"""A stand-in for the road to the SELMS+ export: the Knox portal whose top menu opens SELMS+ in a new tab, then the
+SSO check with its Confirm button, the menu "Contract Mgmt." with "My Contract", the My Contract filters (in a frame,
+as the real one), Search and Excel Download. Serves on a free local port; records what the robot sent so the test can
+check it. The portal writes the link as "SELMS + " with a non-breaking space, as the real one does."""
 
 from __future__ import annotations
 
@@ -18,6 +19,11 @@ CONTRACTS = [
 ]
 
 PAGES = {
+    "/portalapp/home": """<html><body><div class="knox">Knox Portal</div>
+      <div class="menu"><a href="/portalapp/home">Home</a> <a href="#">Mail</a> <a href="#">Approval</a> <a href="#">Schedule</a>
+        <a href="#">Task</a> <a href="#">Memo</a> <a href="#">Conference</a> <a href="#">Contact</a> <a href="#">Board</a>
+        <a href="#">Community</a> <a href="#">GHRP</a> <a href="#">MOSAIC</a> <a href="#">Compliance</a> <a href="#">GWP</a>
+        <a href="/secfw/ssoCheck.do" target="_blank">SELMS&nbsp;+ </a></div></body></html>""",
     "/secfw/ssoCheck.do": """<html><body><h1>SELMS+</h1><p>Legal &amp; PA &nbsp; Camil AMRAT</p>
       <p>This System is strictly restricted to authorized users only.</p>
       <button onclick="location.href='/main.do'">Créer un raccourci</button>
