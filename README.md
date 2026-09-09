@@ -6,6 +6,12 @@ dashboard. One Python process, one SQLite database, one browser. No server, no c
 
 ## Getting started
 
+Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run prepares the
+environment and fills the dashboard with fictitious data, which takes a few minutes; every later run starts in
+seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed.
+
+By hand, if you prefer:
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows   (Linux/macOS: source .venv/bin/activate)
@@ -67,6 +73,24 @@ Action catalogue: `mail.read`, `mail.reply`, `doc.read`, `doc.fill`, `web.browse
 `send`, `archive`, `wait`. An uncaught exception marks the run as failed, with the faulty action and the
 trace in the journal.
 
+## Sharing it with the team
+
+Pulsar is already a web server, so one machine can serve the whole department: run it on the workstation that
+has access to the applications the robots drive, with
+
+```bash
+set PULSAR_HOST=0.0.0.0         # Windows   (Linux/macOS: export PULSAR_HOST=0.0.0.0)
+pulsar
+```
+
+and colleagues open `http://<name-of-that-pc>:8765` from the internal network. Everyone then sees the same open
+space, the same history and the same scenarios. That machine has to stay on for the schedules to fire, and the
+credential vault stays on it: nothing is published outside.
+
+This is the only way to share the platform itself. A static host such as GitHub Pages serves files and runs no
+Python, so it can show the interface but cannot run a single scenario, reach an internal application, hold the
+vault or fire a schedule. What it can host is the preview below.
+
 ## The online preview
 
 The platform runs on a workstation, not on a web host: it holds a database, runs scenarios in the background and
@@ -89,6 +113,7 @@ pulsar/         core: app.py (routes), db.py, registry.py, runner.py, team.py, s
 tools/          build_preview.py (the published page) and the open space artwork scripts
 scenarios/      scenarios shipped with the code (two demos + the SELMS+ extraction skeleton)
 workspace/      local data, outside git: pulsar.db, deposited scenarios and their versions, outputs/, vault
+start.bat       one-click start on Windows; start.sh does the same on macOS and Linux
 tests/          pytest
 docs/           framing and decisions; docs/preview/ holds the published page
 .github/        the workflow that publishes the preview on GitHub Pages
