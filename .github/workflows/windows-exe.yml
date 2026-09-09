@@ -1,0 +1,42 @@
+# Builds Pulsar.exe on a Windows machine at GitHub, so nobody has to build it by hand.
+# Run it from the Actions tab ("Run workflow"); the executable is attached to the run, under Artifacts. Pushing a
+# tag such as v0.3.0 also publishes it as a release.
+name: Windows executable
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e . pyinstaller
+      - run: python -m PyInstaller tools/pulsar.spec --noconfirm
+      - name: Check the executable starts and serves the dashboard
+        shell: pwsh
+        run: |
+          $exe = Start-Process -FilePath dist\Pulsar.exe -PassThru
+          $ok = $false
+          foreach ($i in 1..60) {
+            Start-Sleep -Seconds 2
+            try { if ((Invoke-WebRequest http://127.0.0.1:8765/health -UseBasicParsing).StatusCode -eq 200) { $ok = $true; break } } catch {}
+          }
+          Stop-Process -Id $exe.Id -Force
+          if (-not $ok) { throw "Pulsar.exe did not answer on http://127.0.0.1:8765" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pulsar-windows
+          path: dist/Pulsar.exe
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/Pulsar.exe
