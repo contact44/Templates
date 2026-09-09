@@ -8,13 +8,6 @@ window.PulsarPreview = (function () {
   var TEAM = ["Andromede", "Orion", "Sirius"];
   // the scenarios shipped with the platform, with the sentence shown over the robot for each of their actions
   var SCENARIOS = [
-    {key: "demo_inventory", name: "Folder inventory (demo)", steps: [
-      {kind: "doc.read", label: "Listing the folder inbox"},
-      {kind: "archive", label: "Writing the CSV inventory"}]},
-    {key: "demo_load", name: "Simulated load (demo)", steps: [
-      {kind: "mail.read", label: "Reading the demonstration mailbox"},
-      {kind: "doc.read", label: "Processing the fictitious batch"},
-      {kind: "archive", label: "Filing the results"}]},
     {key: "selms_extraction", name: "SELMS+ Excel download", steps: [
       {kind: "web.browse", label: "Opening SELMS+"},
       {kind: "web.browse", label: "Confirming the sign-in"},
