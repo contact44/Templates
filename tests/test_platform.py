@@ -272,19 +272,3 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
     finally:
         Handler.search_delay = 0.0
         server.shutdown()
-
-
-def test_executable_recipe_carries_everything_the_platform_needs():
-    """tools/pulsar.spec must bundle the templates, the static files and the shipped scenarios, and the imports
-    the platform resolves by name at run time (uvicorn, the scheduler triggers, the vault backends)."""
-    spec = (ROOT / "tools" / "pulsar.spec").read_text(encoding="utf-8")
-    for needed in ('"pulsar/templates"', '"pulsar/static"', '"scenarios"'):
-        assert needed in spec, needed
-    for module in ("uvicorn", "apscheduler", "keyring.backends", "tzdata"):
-        assert module in spec, module
-    assert (ROOT / "tools" / "pulsar_launcher.py").exists()
-    assert (ROOT / "tools" / "pulsar.ico").exists()
-
-    launcher = (ROOT / "tools" / "pulsar_launcher.py").read_text(encoding="utf-8")
-    assert "PULSAR_WORKSPACE" in launcher and "Pulsar data" in launcher   # data beside the executable, not in temp
-    assert "_MEIPASS" in launcher                                        # shipped files read from the unpacked bundle

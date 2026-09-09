@@ -6,25 +6,17 @@ dashboard. One Python process, one SQLite database, one browser. No server, no c
 
 ## Getting started
 
-**With the executable.** `Pulsar.exe` is the platform as one file: double-click it and it starts, opens the
-browser and keeps running until you close its window. Nothing to install, not even Python. It writes its data to
-a `Pulsar data` folder next to itself, so keep the two together and copy them wherever you like.
-
-To obtain it, either download it from the repository (Actions tab, the "Windows executable" workflow, then
-Artifacts; a release is published for every version tag), or build it on the PC by double-clicking `build-exe.bat`,
-which needs Python once and leaves the result in `dist\Pulsar.exe`. The recipe is `tools/pulsar.spec`.
-
-**From the sources.** Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run
-prepares the environment and fills the dashboard with fictitious data, which takes a few minutes; every later run
-starts in seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed.
+Double-click `start.bat` on Windows, or run `./start.sh` on macOS and Linux. The first run installs the platform
+and everything the robots need to drive a browser and read an Excel file, which takes a few minutes; every later
+run starts in seconds and opens http://127.0.0.1:8765 in the browser. Python 3.11 or later must be installed,
+with "Add python.exe to PATH" ticked.
 
 By hand, if you prefer:
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows   (Linux/macOS: source .venv/bin/activate)
-pip install -e .[dev]
-pulsar demo-data                # optional: 14 days of fictitious runs to populate the dashboard
+pip install -e .[rpa]           # the platform, plus what the robots need to drive a browser
 pulsar                          # http://127.0.0.1:8765
 ```
 
@@ -87,13 +79,7 @@ trace in the journal.
 step by step: open the SSO check page, Confirm, Contract Mgmt. then My Contract, Request Date from 01/01/2016 to
 the end of the current month with Closed = N, Search, Excel Download, then the file by email. It drives Microsoft
 Edge through Playwright with a browser profile kept in the workspace, so the Samsung SSO session survives between
-runs; the email leaves through Outlook on the machine. On the workstation that will run it:
-
-```bash
-pip install -e .[rpa]           # Playwright, openpyxl, pywin32
-```
-
-Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
+runs; the email leaves through Outlook on the machine. `start.bat` installs what it needs. Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
 asks for a sign-in you do it in that window, the robot waits and carries on. Once the session is remembered you
 can turn Headless on, and the scheduled runs happen in the background with no window at all. Every step leaves a screenshot in
 `workspace/outputs/selms_extraction/`, which is where to look if the site has moved something. The scenario is
@@ -137,10 +123,9 @@ server. `.github/workflows/preview.yml` rebuilds and publishes it on GitHub Page
 ```
 pulsar/         core: app.py (routes), db.py, registry.py, runner.py, team.py, scheduler.py, vault.py, stats.py, templates/, static/
 tools/          build_preview.py (the published page) and the open space artwork scripts
-scenarios/      scenarios shipped with the code (two demos + the SELMS+ Excel download)
+scenarios/      the scenarios shipped with the code (the SELMS+ Excel download)
 workspace/      local data, outside git: pulsar.db, deposited scenarios and their versions, outputs/, vault
 start.bat       one-click start on Windows; start.sh does the same on macOS and Linux
-build-exe.bat   builds Pulsar.exe, the platform as a single file (recipe: tools/pulsar.spec)
 tests/          pytest
 docs/           framing and decisions; docs/preview/ holds the published page
 .github/        the workflow that publishes the preview on GitHub Pages

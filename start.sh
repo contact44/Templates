@@ -13,8 +13,7 @@ if [ ! -x ".venv/bin/python" ]; then
   echo "Preparing Samsung Pulsar. This happens once and takes a few minutes."
   python3 -m venv .venv
   .venv/bin/python -m pip install --quiet --upgrade pip
-  .venv/bin/python -m pip install --quiet -e .
-  .venv/bin/python -m pulsar demo-data
+  .venv/bin/python -m pip install --quiet -e .[rpa]
 fi
 
 echo "Starting Samsung Pulsar on http://127.0.0.1:8765 (press Ctrl+C to stop)"

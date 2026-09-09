@@ -292,7 +292,7 @@ The screens below are the real interface rendered once, with the buttons disable
 takes a Python process on a workstation: see the README of the repository.</div>
 <section class="snap"><div class="snap-label">Dashboard, the open space <span class="mono">localhost:8765/</span> (the live view, simulated in this page)</div><div class="page"><div class="page-head">
   <div><h1>Robot activity</h1>
-  <p class="sub">0 of 3 robots busy, 2 of 3 scenarios enabled. The live view refreshes every 2 seconds, the figures every 30 seconds.</p></div>
+  <p class="sub">0 of 3 robots busy, 0 of 1 scenarios enabled. The live view refreshes every 2 seconds, the figures every 30 seconds.</p></div>
   <div class="legend"><span><i class="sw" style="background:var(--running)"></i>Working</span><span><i class="sw success"></i>Success</span><span><i class="sw warning"></i>With warnings</span><span><i class="sw error"></i>Failed</span></div>
 </div><div class="cockpit">
 <section class="panel openspace-panel">
@@ -342,7 +342,7 @@ takes a Python process on a workstation: see the README of the repository.</div>
   
 <div class="page-head">
   <div><h1>Robot activity</h1>
-  <p class="sub">0 of 3 robots busy, 2 of 3 scenarios enabled. The live view refreshes every 2 seconds, the figures every 30 seconds.</p></div>
+  <p class="sub">0 of 3 robots busy, 0 of 1 scenarios enabled. The live view refreshes every 2 seconds, the figures every 30 seconds.</p></div>
   <div class="legend"><span><i class="sw" style="background:var(--running)"></i>Working</span><span><i class="sw success"></i>Success</span><span><i class="sw warning"></i>With warnings</span><span><i class="sw error"></i>Failed</span></div>
 </div>
 
@@ -463,24 +463,6 @@ takes a Python process on a workstation: see the README of the repository.</div>
   
   <div class="cards">
     
-    <a class="card " >
-      <div class="card-head"><span class="name">Folder inventory (demo)</span><span class="pill success"><i class="dot"></i>Success</span></div>
-      <div class="card-meta"><span>Last run 07 Sep 03:19</span>
-        <span>On demand</span></div>
-      <div class="card-stats"><div><b>100 %</b><span>success, 7 days</span></div><div><b>5.0 s</b><span>average duration</span></div><div><b>28</b><span>tasks, 7 days</span></div></div>
-      <svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"><polygon class="area" points="2.0,28 2.0,2.0 31.0,15.9 60.0,14.9 89.0,26.0 118.0,16.0 118.0,28"></polygon><polyline class="line" points="2.0,2.0 31.0,15.9 60.0,14.9 89.0,26.0 118.0,16.0"></polyline><circle class="end" cx="118.0" cy="16.0" r="3"></circle></svg>
-      <div class="card-foot">duration of the last 5 runs</div>
-    </a>
-    
-    <a class="card " >
-      <div class="card-head"><span class="name">Simulated load (demo)</span><span class="pill warning"><i class="dot"></i>With warnings</span></div>
-      <div class="card-meta"><span>Last run today 06:05</span>
-        <span>Invalid schedule</span></div>
-      <div class="card-stats"><div><b>78 %</b><span>success, 7 days</span></div><div><b>6.1 s</b><span>average duration</span></div><div><b>2,299</b><span>tasks, 7 days</span></div></div>
-      <svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"><polygon class="area" points="2.0,28 2.0,25.0 8.1,5.9 14.2,13.1 20.3,6.9 26.4,12.5 32.5,6.7 38.6,25.4 44.7,15.3 50.8,15.1 56.9,3.2 63.1,15.3 69.2,9.6 75.3,22.9 81.4,22.4 87.5,16.3 93.6,26.0 99.7,18.1 105.8,2.0 111.9,19.7 118.0,22.7 118.0,28"></polygon><polyline class="line" points="2.0,25.0 8.1,5.9 14.2,13.1 20.3,6.9 26.4,12.5 32.5,6.7 38.6,25.4 44.7,15.3 50.8,15.1 56.9,3.2 63.1,15.3 69.2,9.6 75.3,22.9 81.4,22.4 87.5,16.3 93.6,26.0 99.7,18.1 105.8,2.0 111.9,19.7 118.0,22.7"></polyline><circle class="end" cx="118.0" cy="22.7" r="3"></circle></svg>
-      <div class="card-foot">duration of the last 20 runs</div>
-    </a>
-    
     <a class="card off" >
       <div class="card-head"><span class="name">SELMS+ Excel download</span><span class="pill warning"><i class="dot"></i>With warnings</span></div>
       <div class="card-meta"><span>Last run 06 Sep 01:44</span>
@@ -497,7 +479,7 @@ takes a Python process on a workstation: see the README of the repository.</div>
   <section class="panel">
     <div class="panel-head"><h2>Needs a look</h2><a class="btn small" >All failures</a></div>
     
-    <ul class="list"><li><a ><div class="row"><b>SELMS+ Excel download</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">06 Sep 01:44, 45 tasks done, 3 failed</div></a></li><li><a ><div class="row"><b>Simulated load (demo)</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">today 06:05, 70 tasks done, 4 failed</div></a></li><li><a ><div class="row"><b>Simulated load (demo)</b><span class="pill error"><i class="dot"></i>Failed</span></div><div class="muted">08 Sep 08:27, TimeoutError: source unavailable (simulated)</div></a></li><li><a ><div class="row"><b>Simulated load (demo)</b><span class="pill error"><i class="dot"></i>Failed</span></div><div class="muted">08 Sep 09:12, TimeoutError: source unavailable (simulated)</div></a></li><li><a ><div class="row"><b>Simulated load (demo)</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">07 Sep 05:27, 137 tasks done, 3 failed</div></a></li><li><a ><div class="row"><b>Simulated load (demo)</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">05 Sep 04:58, 50 tasks done, 1 failed</div></a></li></ul>
+    <ul class="list"><li><a ><div class="row"><b>SELMS+ Excel download</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">06 Sep 01:44, 45 tasks done, 3 failed</div></a></li><li><a ><div class="row"><b>demo_load</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">today 06:05, 70 tasks done, 4 failed</div></a></li><li><a ><div class="row"><b>demo_load</b><span class="pill error"><i class="dot"></i>Failed</span></div><div class="muted">08 Sep 08:27, TimeoutError: source unavailable (simulated)</div></a></li><li><a ><div class="row"><b>demo_load</b><span class="pill error"><i class="dot"></i>Failed</span></div><div class="muted">08 Sep 09:12, TimeoutError: source unavailable (simulated)</div></a></li><li><a ><div class="row"><b>demo_load</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">07 Sep 05:27, 137 tasks done, 3 failed</div></a></li><li><a ><div class="row"><b>demo_load</b><span class="pill warning"><i class="dot"></i>With warnings</span></div><div class="muted">05 Sep 04:58, 50 tasks done, 1 failed</div></a></li></ul>
   </section>
   <section class="panel">
     <div class="panel-head"><h2>Latest runs</h2><a class="btn small" >History</a></div>
@@ -505,13 +487,13 @@ takes a Python process on a workstation: see the README of the repository.</div>
       <tr><td><a >SELMS+ Excel download</a></td><td>Andromede</td><td>06 Sep 01:44</td><td class="num">4.0 s</td><td class="num">45</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td></tr>
       <tr><td><a >SELMS+ Excel download</a></td><td>Orion</td><td>01 Sep 09:55</td><td class="num">6.8 s</td><td class="num">35</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
       <tr><td><a >SELMS+ Excel download</a></td><td>Andromede</td><td>29 Aug 01:48</td><td class="num">5.5 s</td><td class="num">22</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>today 06:05</td><td class="num">4.3 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>today 08:42</td><td class="num">5.0 s</td><td class="num">50</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>08 Sep 08:27</td><td class="num">9.3 s</td><td class="num">32</td><td><span class="pill error"><i class="dot"></i>Failed</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 05:31</td><td class="num">5.4 s</td><td class="num">102</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 09:37</td><td class="num">3.5 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Orion</td><td>08 Sep 09:49</td><td class="num">5.8 s</td><td class="num">135</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
-      <tr><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 09:12</td><td class="num">4.3 s</td><td class="num">105</td><td><span class="pill error"><i class="dot"></i>Failed</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Sirius</td><td>today 06:05</td><td class="num">4.3 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Andromede</td><td>today 08:42</td><td class="num">5.0 s</td><td class="num">50</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Andromede</td><td>08 Sep 08:27</td><td class="num">9.3 s</td><td class="num">32</td><td><span class="pill error"><i class="dot"></i>Failed</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 05:31</td><td class="num">5.4 s</td><td class="num">102</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 09:37</td><td class="num">3.5 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Orion</td><td>08 Sep 09:49</td><td class="num">5.8 s</td><td class="num">135</td><td><span class="pill success"><i class="dot"></i>Success</span></td></tr>
+      <tr><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 09:12</td><td class="num">4.3 s</td><td class="num">105</td><td><span class="pill error"><i class="dot"></i>Failed</span></td></tr>
       
     </tbody></table></div>
   </section>
@@ -531,26 +513,6 @@ takes a Python process on a workstation: see the README of the repository.</div>
 <div class="tw"><table class="t">
   <thead><tr><th>Scenario</th><th>Origin</th><th>Schedule</th><th>Next run</th><th>Last run</th><th>Status</th><th></th></tr></thead>
   <tbody>
-  
-  <tr class="">
-    <td><a ><b>Folder inventory (demo)</b></a><div class="muted small">Lists the files of a workspace folder and writes a CSV inventory to outputs/demo_inventory/.</div></td>
-    <td class="small">shipped with the code</td>
-    <td>On demand</td>
-    <td></td>
-    <td>07 Sep 03:19</td>
-    <td><span class="pill success"><i class="dot"></i>Success</span></td>
-    <td class="actions"><div class="form-static"><button disabled class="btn small" type="submit" >Run</button></div></td>
-  </tr>
-  
-  <tr class="">
-    <td><a ><b>Simulated load (demo)</b></a><div class="muted small">Performs a batch of fictitious tasks while declaring its actions, with adjustable duration and failure rate.</div></td>
-    <td class="small">shipped with the code</td>
-    <td><span class="mono">*/10 * * * *</span></td>
-    <td></td>
-    <td>today 06:05</td>
-    <td><span class="pill warning"><i class="dot"></i>With warnings</span></td>
-    <td class="actions"><div class="form-static"><button disabled class="btn small" type="submit" >Run</button></div></td>
-  </tr>
   
   <tr class="off">
     <td><a ><b>SELMS+ Excel download</b></a><div class="muted small">Signs in to SELMS+, opens My Contract, filters the requests from 01/01/2016 to the end of the current month with Closed = N, downloads the Excel export and sends it by email.</div></td>
@@ -1445,7 +1407,7 @@ def count_rows(path: Path) -&gt; int:
   
 <div class="page-head"><div><h1>Run history</h1><p class="sub">67 runs</p></div></div>
 <div class="form-static">
-  <label>Scenario<select name="scenario"><option value="">All</option><option value="demo_inventory" >Folder inventory (demo)</option><option value="demo_load" >Simulated load (demo)</option><option value="selms_extraction" >SELMS+ Excel download</option></select></label>
+  <label>Scenario<select name="scenario"><option value="">All</option><option value="selms_extraction" >SELMS+ Excel download</option></select></label>
   <label>Status<select name="status"><option value="">All</option><option value="queued" >Queued</option><option value="running" >Running</option><option value="success" >Success</option><option value="warning" >With warnings</option><option value="error" >Failed</option></select></label>
   <button disabled class="btn" type="submit">Filter</button>
 </div>
@@ -1456,43 +1418,43 @@ def count_rows(path: Path) -&gt; int:
   <tr><td><a  class="mono">67</a></td><td><a >SELMS+ Excel download</a></td><td>Andromede</td><td>06 Sep 01:44</td><td>demo</td><td class="num">4.0 s</td><td class="num">45</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">45 tasks done, 3 failed</td></tr>
   <tr><td><a  class="mono">66</a></td><td><a >SELMS+ Excel download</a></td><td>Orion</td><td>01 Sep 09:55</td><td>demo</td><td class="num">6.8 s</td><td class="num">35</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">35 tasks done</td></tr>
   <tr><td><a  class="mono">65</a></td><td><a >SELMS+ Excel download</a></td><td>Andromede</td><td>29 Aug 01:48</td><td>demo</td><td class="num">5.5 s</td><td class="num">22</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">22 tasks done</td></tr>
-  <tr><td><a  class="mono">64</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>today 06:05</td><td>demo</td><td class="num">4.3 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">70 tasks done, 4 failed</td></tr>
-  <tr><td><a  class="mono">63</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>today 08:42</td><td>demo</td><td class="num">5.0 s</td><td class="num">50</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">50 tasks done</td></tr>
-  <tr><td><a  class="mono">62</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>08 Sep 08:27</td><td>demo</td><td class="num">9.3 s</td><td class="num">32</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
-  <tr><td><a  class="mono">61</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 05:31</td><td>demo</td><td class="num">5.4 s</td><td class="num">102</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">102 tasks done</td></tr>
-  <tr><td><a  class="mono">60</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 09:37</td><td>demo</td><td class="num">3.5 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">97 tasks done</td></tr>
-  <tr><td><a  class="mono">59</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>08 Sep 09:49</td><td>demo</td><td class="num">5.8 s</td><td class="num">135</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">135 tasks done</td></tr>
-  <tr><td><a  class="mono">58</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>08 Sep 09:12</td><td>demo</td><td class="num">4.3 s</td><td class="num">105</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
-  <tr><td><a  class="mono">57</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>07 Sep 10:14</td><td>demo</td><td class="num">4.2 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">97 tasks done</td></tr>
-  <tr><td><a  class="mono">56</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>07 Sep 02:44</td><td>demo</td><td class="num">7.4 s</td><td class="num">58</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">58 tasks done</td></tr>
-  <tr><td><a  class="mono">55</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>07 Sep 05:51</td><td>demo</td><td class="num">6.0 s</td><td class="num">104</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">104 tasks done</td></tr>
-  <tr><td><a  class="mono">54</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>07 Sep 05:27</td><td>demo</td><td class="num">9.0 s</td><td class="num">137</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">137 tasks done, 3 failed</td></tr>
-  <tr><td><a  class="mono">53</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>07 Sep 04:21</td><td>demo</td><td class="num">6.1 s</td><td class="num">74</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">74 tasks done</td></tr>
-  <tr><td><a  class="mono">52</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>07 Sep 05:24</td><td>demo</td><td class="num">6.1 s</td><td class="num">20</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">20 tasks done</td></tr>
-  <tr><td><a  class="mono">51</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>06 Sep 04:56</td><td>demo</td><td class="num">3.6 s</td><td class="num">74</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">74 tasks done</td></tr>
-  <tr><td><a  class="mono">50</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>06 Sep 02:26</td><td>demo</td><td class="num">8.1 s</td><td class="num">127</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">127 tasks done</td></tr>
-  <tr><td><a  class="mono">49</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>06 Sep 10:29</td><td>demo</td><td class="num">6.7 s</td><td class="num">34</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">34 tasks done</td></tr>
-  <tr><td><a  class="mono">48</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>05 Sep 04:58</td><td>demo</td><td class="num">8.1 s</td><td class="num">50</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">50 tasks done, 1 failed</td></tr>
-  <tr><td><a  class="mono">47</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>05 Sep 06:07</td><td>demo</td><td class="num">6.6 s</td><td class="num">132</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">132 tasks done, 2 failed</td></tr>
-  <tr><td><a  class="mono">46</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>05 Sep 07:02</td><td>demo</td><td class="num">8.3 s</td><td class="num">153</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">153 tasks done</td></tr>
-  <tr><td><a  class="mono">45</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>05 Sep 08:25</td><td>demo</td><td class="num">3.7 s</td><td class="num">37</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">37 tasks done</td></tr>
-  <tr><td><a  class="mono">44</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>04 Sep 09:58</td><td>demo</td><td class="num">6.4 s</td><td class="num">78</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">78 tasks done</td></tr>
-  <tr><td><a  class="mono">43</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>04 Sep 01:18</td><td>demo</td><td class="num">6.0 s</td><td class="num">39</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">39 tasks done</td></tr>
-  <tr><td><a  class="mono">42</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>03 Sep 02:00</td><td>demo</td><td class="num">6.7 s</td><td class="num">144</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">144 tasks done</td></tr>
-  <tr><td><a  class="mono">41</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>03 Sep 05:08</td><td>demo</td><td class="num">8.4 s</td><td class="num">160</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">160 tasks done</td></tr>
-  <tr><td><a  class="mono">40</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>03 Sep 11:13</td><td>demo</td><td class="num">3.5 s</td><td class="num">36</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">36 tasks done</td></tr>
-  <tr><td><a  class="mono">39</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>03 Sep 07:54</td><td>demo</td><td class="num">6.2 s</td><td class="num">105</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">105 tasks done</td></tr>
-  <tr><td><a  class="mono">38</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>03 Sep 01:11</td><td>demo</td><td class="num">6.0 s</td><td class="num">49</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">49 tasks done</td></tr>
-  <tr><td><a  class="mono">37</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>02 Sep 12:29</td><td>demo</td><td class="num">8.4 s</td><td class="num">92</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">92 tasks done, 1 failed</td></tr>
-  <tr><td><a  class="mono">36</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>02 Sep 05:47</td><td>demo</td><td class="num">7.2 s</td><td class="num">127</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">127 tasks done</td></tr>
-  <tr><td><a  class="mono">35</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>02 Sep 01:37</td><td>demo</td><td class="num">4.7 s</td><td class="num">97</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
-  <tr><td><a  class="mono">34</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>02 Sep 05:43</td><td>demo</td><td class="num">9.2 s</td><td class="num">158</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">158 tasks done</td></tr>
-  <tr><td><a  class="mono">33</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>02 Sep 09:26</td><td>demo</td><td class="num">9.4 s</td><td class="num">11</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">11 tasks done</td></tr>
-  <tr><td><a  class="mono">32</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>02 Sep 09:08</td><td>demo</td><td class="num">7.9 s</td><td class="num">106</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">106 tasks done</td></tr>
-  <tr><td><a  class="mono">31</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>01 Sep 09:25</td><td>demo</td><td class="num">5.4 s</td><td class="num">132</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">132 tasks done</td></tr>
-  <tr><td><a  class="mono">30</a></td><td><a >Simulated load (demo)</a></td><td>Orion</td><td>01 Sep 08:18</td><td>demo</td><td class="num">8.9 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">70 tasks done, 3 failed</td></tr>
-  <tr><td><a  class="mono">29</a></td><td><a >Simulated load (demo)</a></td><td>Sirius</td><td>01 Sep 04:36</td><td>demo</td><td class="num">8.9 s</td><td class="num">143</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">143 tasks done</td></tr>
-  <tr><td><a  class="mono">28</a></td><td><a >Simulated load (demo)</a></td><td>Andromede</td><td>01 Sep 01:43</td><td>demo</td><td class="num">6.5 s</td><td class="num">45</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">45 tasks done</td></tr>
+  <tr><td><a  class="mono">64</a></td><td><a >demo_load</a></td><td>Sirius</td><td>today 06:05</td><td>demo</td><td class="num">4.3 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">70 tasks done, 4 failed</td></tr>
+  <tr><td><a  class="mono">63</a></td><td><a >demo_load</a></td><td>Andromede</td><td>today 08:42</td><td>demo</td><td class="num">5.0 s</td><td class="num">50</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">50 tasks done</td></tr>
+  <tr><td><a  class="mono">62</a></td><td><a >demo_load</a></td><td>Andromede</td><td>08 Sep 08:27</td><td>demo</td><td class="num">9.3 s</td><td class="num">32</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
+  <tr><td><a  class="mono">61</a></td><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 05:31</td><td>demo</td><td class="num">5.4 s</td><td class="num">102</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">102 tasks done</td></tr>
+  <tr><td><a  class="mono">60</a></td><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 09:37</td><td>demo</td><td class="num">3.5 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">97 tasks done</td></tr>
+  <tr><td><a  class="mono">59</a></td><td><a >demo_load</a></td><td>Orion</td><td>08 Sep 09:49</td><td>demo</td><td class="num">5.8 s</td><td class="num">135</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">135 tasks done</td></tr>
+  <tr><td><a  class="mono">58</a></td><td><a >demo_load</a></td><td>Sirius</td><td>08 Sep 09:12</td><td>demo</td><td class="num">4.3 s</td><td class="num">105</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
+  <tr><td><a  class="mono">57</a></td><td><a >demo_load</a></td><td>Andromede</td><td>07 Sep 10:14</td><td>demo</td><td class="num">4.2 s</td><td class="num">97</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">97 tasks done</td></tr>
+  <tr><td><a  class="mono">56</a></td><td><a >demo_load</a></td><td>Andromede</td><td>07 Sep 02:44</td><td>demo</td><td class="num">7.4 s</td><td class="num">58</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">58 tasks done</td></tr>
+  <tr><td><a  class="mono">55</a></td><td><a >demo_load</a></td><td>Andromede</td><td>07 Sep 05:51</td><td>demo</td><td class="num">6.0 s</td><td class="num">104</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">104 tasks done</td></tr>
+  <tr><td><a  class="mono">54</a></td><td><a >demo_load</a></td><td>Andromede</td><td>07 Sep 05:27</td><td>demo</td><td class="num">9.0 s</td><td class="num">137</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">137 tasks done, 3 failed</td></tr>
+  <tr><td><a  class="mono">53</a></td><td><a >demo_load</a></td><td>Sirius</td><td>07 Sep 04:21</td><td>demo</td><td class="num">6.1 s</td><td class="num">74</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">74 tasks done</td></tr>
+  <tr><td><a  class="mono">52</a></td><td><a >demo_load</a></td><td>Sirius</td><td>07 Sep 05:24</td><td>demo</td><td class="num">6.1 s</td><td class="num">20</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">20 tasks done</td></tr>
+  <tr><td><a  class="mono">51</a></td><td><a >demo_load</a></td><td>Andromede</td><td>06 Sep 04:56</td><td>demo</td><td class="num">3.6 s</td><td class="num">74</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">74 tasks done</td></tr>
+  <tr><td><a  class="mono">50</a></td><td><a >demo_load</a></td><td>Andromede</td><td>06 Sep 02:26</td><td>demo</td><td class="num">8.1 s</td><td class="num">127</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">127 tasks done</td></tr>
+  <tr><td><a  class="mono">49</a></td><td><a >demo_load</a></td><td>Orion</td><td>06 Sep 10:29</td><td>demo</td><td class="num">6.7 s</td><td class="num">34</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">34 tasks done</td></tr>
+  <tr><td><a  class="mono">48</a></td><td><a >demo_load</a></td><td>Andromede</td><td>05 Sep 04:58</td><td>demo</td><td class="num">8.1 s</td><td class="num">50</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">50 tasks done, 1 failed</td></tr>
+  <tr><td><a  class="mono">47</a></td><td><a >demo_load</a></td><td>Sirius</td><td>05 Sep 06:07</td><td>demo</td><td class="num">6.6 s</td><td class="num">132</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">132 tasks done, 2 failed</td></tr>
+  <tr><td><a  class="mono">46</a></td><td><a >demo_load</a></td><td>Sirius</td><td>05 Sep 07:02</td><td>demo</td><td class="num">8.3 s</td><td class="num">153</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">153 tasks done</td></tr>
+  <tr><td><a  class="mono">45</a></td><td><a >demo_load</a></td><td>Sirius</td><td>05 Sep 08:25</td><td>demo</td><td class="num">3.7 s</td><td class="num">37</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">37 tasks done</td></tr>
+  <tr><td><a  class="mono">44</a></td><td><a >demo_load</a></td><td>Sirius</td><td>04 Sep 09:58</td><td>demo</td><td class="num">6.4 s</td><td class="num">78</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">78 tasks done</td></tr>
+  <tr><td><a  class="mono">43</a></td><td><a >demo_load</a></td><td>Andromede</td><td>04 Sep 01:18</td><td>demo</td><td class="num">6.0 s</td><td class="num">39</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">39 tasks done</td></tr>
+  <tr><td><a  class="mono">42</a></td><td><a >demo_load</a></td><td>Andromede</td><td>03 Sep 02:00</td><td>demo</td><td class="num">6.7 s</td><td class="num">144</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">144 tasks done</td></tr>
+  <tr><td><a  class="mono">41</a></td><td><a >demo_load</a></td><td>Orion</td><td>03 Sep 05:08</td><td>demo</td><td class="num">8.4 s</td><td class="num">160</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">160 tasks done</td></tr>
+  <tr><td><a  class="mono">40</a></td><td><a >demo_load</a></td><td>Sirius</td><td>03 Sep 11:13</td><td>demo</td><td class="num">3.5 s</td><td class="num">36</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">36 tasks done</td></tr>
+  <tr><td><a  class="mono">39</a></td><td><a >demo_load</a></td><td>Sirius</td><td>03 Sep 07:54</td><td>demo</td><td class="num">6.2 s</td><td class="num">105</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">105 tasks done</td></tr>
+  <tr><td><a  class="mono">38</a></td><td><a >demo_load</a></td><td>Sirius</td><td>03 Sep 01:11</td><td>demo</td><td class="num">6.0 s</td><td class="num">49</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">49 tasks done</td></tr>
+  <tr><td><a  class="mono">37</a></td><td><a >demo_load</a></td><td>Andromede</td><td>02 Sep 12:29</td><td>demo</td><td class="num">8.4 s</td><td class="num">92</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">92 tasks done, 1 failed</td></tr>
+  <tr><td><a  class="mono">36</a></td><td><a >demo_load</a></td><td>Sirius</td><td>02 Sep 05:47</td><td>demo</td><td class="num">7.2 s</td><td class="num">127</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">127 tasks done</td></tr>
+  <tr><td><a  class="mono">35</a></td><td><a >demo_load</a></td><td>Andromede</td><td>02 Sep 01:37</td><td>demo</td><td class="num">4.7 s</td><td class="num">97</td><td><span class="pill error"><i class="dot"></i>Failed</span></td><td class="muted">TimeoutError: source unavailable (simulated)</td></tr>
+  <tr><td><a  class="mono">34</a></td><td><a >demo_load</a></td><td>Orion</td><td>02 Sep 05:43</td><td>demo</td><td class="num">9.2 s</td><td class="num">158</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">158 tasks done</td></tr>
+  <tr><td><a  class="mono">33</a></td><td><a >demo_load</a></td><td>Orion</td><td>02 Sep 09:26</td><td>demo</td><td class="num">9.4 s</td><td class="num">11</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">11 tasks done</td></tr>
+  <tr><td><a  class="mono">32</a></td><td><a >demo_load</a></td><td>Andromede</td><td>02 Sep 09:08</td><td>demo</td><td class="num">7.9 s</td><td class="num">106</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">106 tasks done</td></tr>
+  <tr><td><a  class="mono">31</a></td><td><a >demo_load</a></td><td>Andromede</td><td>01 Sep 09:25</td><td>demo</td><td class="num">5.4 s</td><td class="num">132</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">132 tasks done</td></tr>
+  <tr><td><a  class="mono">30</a></td><td><a >demo_load</a></td><td>Orion</td><td>01 Sep 08:18</td><td>demo</td><td class="num">8.9 s</td><td class="num">70</td><td><span class="pill warning"><i class="dot"></i>With warnings</span></td><td class="muted">70 tasks done, 3 failed</td></tr>
+  <tr><td><a  class="mono">29</a></td><td><a >demo_load</a></td><td>Sirius</td><td>01 Sep 04:36</td><td>demo</td><td class="num">8.9 s</td><td class="num">143</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">143 tasks done</td></tr>
+  <tr><td><a  class="mono">28</a></td><td><a >demo_load</a></td><td>Andromede</td><td>01 Sep 01:43</td><td>demo</td><td class="num">6.5 s</td><td class="num">45</td><td><span class="pill success"><i class="dot"></i>Success</span></td><td class="muted">45 tasks done</td></tr>
   
   </tbody>
 </table></div>
@@ -1971,13 +1933,6 @@ window.PulsarPreview = (function () {
   var TEAM = ["Andromede", "Orion", "Sirius"];
   // the scenarios shipped with the platform, with the sentence shown over the robot for each of their actions
   var SCENARIOS = [
-    {key: "demo_inventory", name: "Folder inventory (demo)", steps: [
-      {kind: "doc.read", label: "Listing the folder inbox"},
-      {kind: "archive", label: "Writing the CSV inventory"}]},
-    {key: "demo_load", name: "Simulated load (demo)", steps: [
-      {kind: "mail.read", label: "Reading the demonstration mailbox"},
-      {kind: "doc.read", label: "Processing the fictitious batch"},
-      {kind: "archive", label: "Filing the results"}]},
     {key: "selms_extraction", name: "SELMS+ Excel download", steps: [
       {kind: "web.browse", label: "Opening SELMS+"},
       {kind: "web.browse", label: "Confirming the sign-in"},
