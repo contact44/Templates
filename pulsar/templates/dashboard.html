@@ -9,24 +9,24 @@
 </div>
 {% if d.load_errors %}<div class="flash err"><b>Scenario files with errors:</b>{% for file, msg in d.load_errors.items() %}<div class="mono">{{ file }}: {{ msg }}</div>{% endfor %}</div>{% endif %}
 
+<div class="cockpit">
 <section class="panel openspace-panel">
   <div class="openspace-wrap"><canvas id="openspace" aria-label="The open space: the team at work"></canvas></div>
-  <div class="openspace-foot">
-    <div class="team" id="team">
-      {% for w in d.team %}
-      <div class="member {{ 'busy' if w.busy else 'free' }}">
-        <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})">{% set portrait = openspace_config.avatars[loop.index0 % 3] if openspace_config.avatars else None %}{% if portrait %}<img src="{{ portrait }}" alt="">{% else %}<i></i>{% endif %}</div>
-        <div class="who">
-          <div class="row"><b>{{ w.name }}</b>{% if w.busy %}<span class="state busy">{{ w.step.label if w.step and w.step.label else (w.step.kind if w.step else 'Working') }}</span>{% else %}<span class="state ready">Ready to work</span>{% endif %}</div>
-          {% if w.busy %}<div class="muted">{{ w.scenario_name }}, {{ w['items'] | plural('task') }} done, <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>{% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    <div id="queue">{% if d.queued %}<span class="pill queued"><i class="dot"></i>{{ d.queued | length }} queued: {% for q in d.queued %}{{ q.scenario_name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</div>
-  </div>
 </section>
-
+<div class="cockpit-team">
+  <div class="team" id="team">
+    {% for w in d.team %}
+    <div class="member {{ 'busy' if w.busy else 'free' }}">
+      <div class="avatar" style="--tie:var(--tie-{{ loop.index0 % 3 }})">{% set portrait = openspace_config.avatars[loop.index0 % 3] if openspace_config.avatars else None %}{% if portrait %}<img src="{{ portrait }}" alt="">{% else %}<i></i>{% endif %}</div>
+      <div class="who">
+        <div class="row"><b>{{ w.name }}</b>{% if w.busy %}<span class="state busy">{{ w.step.label if w.step and w.step.label else (w.step.kind if w.step else 'Working') }}</span>{% else %}<span class="state ready">Ready to work</span>{% endif %}</div>
+        {% if w.busy %}<div class="muted">{{ w.scenario_name }}, {{ w['items'] | plural('task') }} done, <a href="/runs/{{ w.run_id }}">run #{{ w.run_id }}</a></div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div id="queue">{% if d.queued %}<span class="pill queued"><i class="dot"></i>{{ d.queued | length }} queued: {% for q in d.queued %}{{ q.scenario_name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</div>
+</div>
 <section class="tiles">
   <div class="tile hero"><div class="k">Runs today</div><div class="v">{{ d.today.runs | n }}</div>
     <div class="d"><span class="dot success"></span>{{ d.today.success }} succeeded <span class="dot warning"></span>{{ d.today.warning }} with warnings <span class="dot error"></span>{{ d.today.error }} failed{% if d.today.running %}, {{ d.today.running }} in progress{% endif %}</div></div>
@@ -34,6 +34,7 @@
   <div class="tile"><div class="k">Average duration over 7 days</div><div class="v">{{ d.week.avg_ms | ms or '' }}</div><div class="d">per finished run</div></div>
   <div class="tile"><div class="k">Tasks done over 7 days</div><div class="v">{{ d.week['items'] | n }}</div><div class="d">{{ d.today['items'] | n }} today</div></div>
 </section>
+</div>
 
 <section class="panel">
   <div class="panel-head"><h2>Runs per day</h2>

@@ -1,9 +1,12 @@
+import os
+import shutil
 import subprocess
 import sys
 import time
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from pulsar import db as dbm
@@ -219,3 +222,34 @@ def test_static_preview_is_one_self_contained_page(tmp_path):
     assert "PulsarPreview" in page                      # the open space is fed by the simulation instead
     assert 'id="openspace"' in page
     assert page.count('class="snap"') >= 6
+
+
+def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_path):
+    """The seven steps of the SELMS+ sheet, on a stand-in site: sign-in, menu, filters, search, download, check."""
+    pytest.importorskip("playwright.sync_api")
+    pytest.importorskip("openpyxl")
+    from tests.fixtures.selms.site import Handler, start
+
+    server, base = start()
+    try:
+        shutil.copy(ROOT / "scenarios" / "selms_extraction.py", settings.scenarios_dir / "selms_extraction.py")
+        platform = Platform(settings)
+        platform.db.save_config("selms_extraction", True, None, {
+            "url": base + "/secfw/ssoCheck.do", "browser": "chromium", "headless": True, "send_email": False,
+            "browser_path": os.environ.get("PULSAR_TEST_BROWSER", ""),
+            "browser_profile": str(tmp_path / "profile"), "start_date": "2016-01-01", "closed": "N", "screenshots": True})
+        run = platform.runner.execute(platform.db.create_run("selms_extraction", "cli"))
+        logs = "\n".join(l["message"] for l in platform.db.logs(run["id"]))
+        assert run["status"] == dbm.STATUS_SUCCESS, logs
+        assert [s["label"] for s in platform.db.steps(run["id"])] == [
+            "Opening SELMS+", "Confirming the sign-in", "Opening My Contract", "Setting the filters", "Searching",
+            "Downloading the Excel export", "Checking the file", "Sending the file by email"]
+        assert run["items"] == 7 and run["metrics"]["contracts"] == 3       # the three open contracts since 2016
+        durations = {s["label"]: s["duration_ms"] for s in platform.db.steps(run["id"])}
+        assert max(durations.values()) < 30000, durations                   # no step waits on a timeout
+        assert any("closed=N" in p and "start=2016-01-01" in p for p in Handler.seen if "excelDownload" in p)
+        outputs = list((settings.workspace / "outputs" / "selms_extraction").glob("*"))
+        assert any(p.suffix == ".xlsx" for p in outputs) and sum(p.suffix == ".png" for p in outputs) == 6
+        platform.db.close()
+    finally:
+        server.shutdown()

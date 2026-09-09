@@ -10,7 +10,9 @@ from .db import Database
 from .registry import Registry
 
 STEP_SETS = {
-    "web.browse": [("web.browse", "Signing in"), ("web.browse", "Filtering and exporting"), ("verify", "Checking the file"), ("archive", "Filing in the shared folder")],
+    "web.browse": [("web.browse", "Opening SELMS+"), ("web.browse", "Confirming the sign-in"), ("web.browse", "Opening My Contract"),
+                   ("doc.fill", "Setting the filters"), ("web.browse", "Searching"), ("doc.read", "Downloading the Excel export"),
+                   ("verify", "Checking the file"), ("send", "Sending the file by email")],
     "default": [("doc.read", "Reading the documents"), ("verify", "Checking"), ("archive", "Filing")],
 }
 

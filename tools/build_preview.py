@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 STATIC = ROOT / "pulsar" / "static"
-SELMS_TRIAL = ("selms_extraction_v2", "SELMS+ extraction (trial)")
+SELMS_TRIAL = ("selms_extraction_v2", "SELMS+ Excel download (trial)")
 
 # the screens of the preview: the page to render, and the label shown above it
 PAGES = [
@@ -32,7 +32,7 @@ PAGES = [
     ("/", "Dashboard, the figures", None),
     ("/scenarios", "Scenarios", None),
     ("/scenarios/new", "Deposit a scenario, after “Check”", None),
-    ("/scenarios/selms_extraction", "Scenario page, monthly SELMS+ extraction", None),
+    ("/scenarios/selms_extraction", "Scenario page, SELMS+ Excel download", None),
     ("/settings", "Settings", None),
     ("/runs", "History", None),
 ]
@@ -46,12 +46,12 @@ def data_uri(path: Path) -> str:
 def freeze(html: str, drop_openspace: bool, keep_openspace_only: bool) -> str:
     """Keep the page body, disable everything that would need a server."""
     inner = re.search(r'<main class="page">(.*?)</main>', html, re.S).group(1)
+    cockpit = re.compile(r'<div class="cockpit">.*?</section>\s*</div>', re.S)   # open space, robots, figures
     if keep_openspace_only:
-        panel = re.search(r'<section class="panel openspace-panel">.*?</section>', inner, re.S).group(0)
         head = re.search(r"<div class=\"page-head\">.*?</div>\s*</div>", inner, re.S)
-        inner = (head.group(0) if head else "") + panel
+        inner = (head.group(0) if head else "") + cockpit.search(inner).group(0)
     elif drop_openspace:
-        inner = re.sub(r'<section class="panel openspace-panel">.*?</section>', "", inner, count=1, flags=re.S)
+        inner = cockpit.sub("", inner, count=1)
     inner = re.sub(r'href="/(?!#)[^"]*"', "", inner)                      # links lead nowhere in one page
     inner = re.sub(r"<form[^>]*>", '<div class="form-static">', inner)     # forms would post to a server
     inner = inner.replace("</form>", "</div>")
@@ -77,7 +77,7 @@ def build(out_dir: Path) -> Path:
         deposit = client.post("/scenarios/deposit", data={
             "code": (ROOT / "scenarios" / "selms_extraction.py").read_text(encoding="utf-8")
                     .replace('KEY = "selms_extraction"', f'KEY = "{SELMS_TRIAL[0]}"')
-                    .replace('NAME = "Monthly SELMS+ extraction"', f'NAME = "{SELMS_TRIAL[1]}"'),
+                    .replace('NAME = "SELMS+ Excel download"', f'NAME = "{SELMS_TRIAL[1]}"'),
             "note": "", "action": "check", "replacing": ""})
         sections = []
         for i, (path, label, note) in enumerate(PAGES):
