@@ -116,6 +116,23 @@ def find_clickable(page, text: str, timeout: float = FIND_TIMEOUT):
         page.wait_for_timeout(500)
 
 
+def blank_page_check(page) -> None:
+    """SELMS+ is declared to Edge as an Internet Explorer mode site. Edge refuses that mode while remote debugging is
+    on, and remote debugging is how Playwright drives a browser, so the page arrives empty and nothing can be clicked.
+    That is not a page that failed to load: it is a page Edge would not render, and no amount of waiting fixes it."""
+    try:
+        text = (page.inner_text("body") or "").strip()
+    except Exception:
+        return
+    if len(text) > 40:
+        return
+    raise RuntimeError(
+        f"{page.url} came back empty. Edge shows this page in Internet Explorer mode, and it will not use that mode "
+        "while a robot drives it (Edge disables IE mode when remote debugging is on, which is how the browser is "
+        "driven). Driving SELMS+ through Edge is therefore a dead end; the export has to be fetched over HTTP instead. "
+        "See the note in the README.")
+
+
 def click_and_follow(context, page, text: str, timeout: float = FIND_TIMEOUT):
     """Click something that may open the application in a new tab, and return the page to carry on with."""
     loc = find_clickable(page, text, timeout)
@@ -274,6 +291,7 @@ def run(ctx):
                     ctx.task_done()
 
             with ctx.step("web.browse", "Confirming the sign-in"):
+                blank_page_check(page)
                 confirm = find_clickable(page, "Confirm", timeout=8)
                 if confirm is None:
                     if ctx.params["headless"]:
