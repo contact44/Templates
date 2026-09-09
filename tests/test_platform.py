@@ -239,7 +239,8 @@ def test_static_preview_is_one_self_contained_page(tmp_path):
 
 
 def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_path):
-    """The seven steps of the SELMS+ sheet, on a stand-in site: sign-in, menu, filters, search, download, check."""
+    """The whole road of the SELMS+ sheet on a stand-in site: portal, new tab, sign-in, menu, filters, search, the
+    export fetched over HTTP with the session cookies, and the check of the file."""
     pytest.importorskip("playwright.sync_api")
     pytest.importorskip("openpyxl")
     browser = os.environ.get("PULSAR_TEST_BROWSER", "")
@@ -253,9 +254,9 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
         shutil.copy(ROOT / "scenarios" / "selms_extraction.py", settings.scenarios_dir / "selms_extraction.py")
         platform = Platform(settings)
         platform.db.save_config("selms_extraction", True, None, {
-            "portal_url": base + "/portalapp/home", "portal_link": "SELMS+",
-            "url": base + "/secfw/ssoCheck.do", "browser": "chromium", "headless": True, "send_email": False,
-            "browser_path": browser,
+            "driver": "playwright", "portal_url": base + "/portalapp/home", "portal_link": "SELMS+",
+            "url": base + "/secfw/ssoCheck.do", "headless": True, "send_email": False,
+            "browser_path": browser, "ie_driver_path": "",
             "browser_profile": str(tmp_path / "profile"), "start_date": "2016-01-01", "closed": "N", "screenshots": True})
         run = platform.runner.execute(platform.db.create_run("selms_extraction", "cli"))
         logs = "\n".join(l["message"] for l in platform.db.logs(run["id"]))
@@ -269,8 +270,48 @@ def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_pa
         assert max(durations.values()) < 30000, durations                   # no step waits on a timeout
         assert any("closed=N" in p and "start=2016-01-01" in p for p in Handler.seen if "excelDownload" in p)
         outputs = list((settings.workspace / "outputs" / "selms_extraction").glob("*"))
-        assert any(p.suffix == ".xlsx" for p in outputs) and sum(p.suffix == ".png" for p in outputs) == 7
+        assert any(p.suffix == ".xlsx" for p in outputs)
+        assert sum(p.suffix == ".png" for p in outputs) == 6      # one per screen the robot went through
         platform.db.close()
     finally:
         Handler.search_delay = 0.0
         server.shutdown()
+
+
+def test_the_internet_explorer_mode_options_are_the_ones_that_open_selms(tmp_path):
+    """SELMS+ only renders in Internet Explorer mode, and Edge turns that mode off for a browser driven through
+    remote debugging. The Internet Explorer driver is the way in, and it needs these four settings on a corporate
+    PC: attach to the installed Edge, and stop refusing to start over zone and zoom settings nobody controls."""
+    pytest.importorskip("selenium")
+    from scenarios.selms_extraction import SeleniumSession
+
+    options = SeleniumSession.ie_options()
+    assert options.attach_to_edge_chrome is True
+    assert options.ignore_protected_mode_settings is True
+    assert options.ignore_zoom_level is True
+    assert options.require_window_focus is False
+
+    options = SeleniumSession.ie_options(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+    assert options.edge_executable_path.endswith("msedge.exe")
+
+
+def test_the_export_is_fetched_over_http_rather_than_through_a_download_bar():
+    """Internet Explorer mode cannot be trusted with a download bar, so the address behind "Excel Download" is read
+    out of the page and fetched with the session cookies."""
+    from scenarios.selms_extraction import export_url
+
+    page = ('<input type="button" value="Excel Download" '
+            "onclick=\"location.href='/contract/excelDownload.do?start=2016-01-01&amp;closed=N'\">")
+    assert export_url(page, "http://selmsplus.sec.samsung.net/contract/myContract.do") == \
+        "http://selmsplus.sec.samsung.net/contract/excelDownload.do?start=2016-01-01&closed=N"
+    assert export_url("<p>nothing here</p>", "http://x/y") is None
+
+
+def test_labels_are_read_as_these_screens_write_them():
+    """The portal menu writes "SELMS + " with a non-breaking space, and every field of My Contract carries a bullet."""
+    from scenarios.selms_extraction import looks_like
+
+    assert looks_like("SELMS\u00a0+ ", "SELMS+") and looks_like("SELMS +", "SELMS+")
+    assert looks_like("\u25aa Request Date", "Request Date") and looks_like("\u25aa Closed", "Closed")
+    assert looks_like("Contract\u00a0Mgmt.", "Contract Mgmt.")
+    assert not looks_like("Confirmer", "Confirm")
