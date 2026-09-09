@@ -2,6 +2,7 @@
 
 | Date | Decision |
 |---|---|
+| 2026-09-09 | SELMS+ cannot be driven through a browser: Edge shows it in Internet Explorer mode, and refuses that mode while remote debugging is on, which is how Playwright drives a browser. The site opens blank under the robot. The scenario now says so plainly instead of failing on an empty page; the export will be fetched over HTTP, replaying the site's own requests. |
 | 2026-09-09 | SELMS+ is entered through the Knox portal (`http://w1.samsung.net/portalapp/home`, then "SELMS+" in the top menu, which opens a new tab), not by its own address: that address alone does not open a session. Portal and link name are parameters. Labels are matched allowing any spacing and the decorations these intranet screens print, since the menu reads "SELMS + " with a non-breaking space and every form field carries a bullet. |
 | 2026-09-09 | No packaged executable: PyInstaller made a 95 MB bundle that still needed the browser and Outlook of the machine, for no gain over `start.bat`. The platform is installed from its sources on the workstation. Only the SELMS+ Excel download ships as a scenario: the two demonstration scenarios are gone, so the dashboard shows the real work and nothing else. |
 | 2026-09-09 | Scenario 1 takes a Headless yes/no option: no shows the browser window, which is also how the SSO sign-in is done by hand the first time; yes runs it in the background, which is what a scheduled run does once the session is remembered. A headless run that meets the sign-in page says so plainly instead of timing out. |

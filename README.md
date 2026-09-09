@@ -82,7 +82,14 @@ new tab. From there: Confirm, Contract Mgmt. then My Contract, Request Date from
 current month with Closed = N, Search, Excel Download, then the file by email. The portal address and the name of
 the link are parameters, so a menu that is renamed or a portal that moves is a field to edit, not code to change. It drives Microsoft
 Edge through Playwright with a browser profile kept in the workspace, so the Samsung SSO session survives between
-runs; the email leaves through Outlook on the machine. `start.bat` installs what it needs. Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
+runs; the email leaves through Outlook on the machine. **A wall found on the real site.** SELMS+ is declared to Edge as an Internet Explorer mode site. Edge refuses that
+mode while remote debugging is on, and remote debugging is exactly how Playwright drives a browser, so SELMS+ opens
+as a blank page under the robot and nothing can be clicked. Waiting, retrying or renaming a button changes nothing:
+driving SELMS+ through a browser is a dead end. The export has to be fetched over HTTP instead, replaying the
+requests the site itself makes, which also makes the run headless by nature and much faster. The browser steps below
+stay in the code for the day SELMS+ leaves IE mode.
+
+`start.bat` installs what it needs. Enable the scenario, leave "Headless" off and run it once by hand: the browser window is then visible, and if SSO
 asks for a sign-in you do it in that window, the robot waits and carries on. Once the session is remembered you
 can turn Headless on, and the scheduled runs happen in the background with no window at all. Every step leaves a screenshot in
 `workspace/outputs/selms_extraction/`, which is where to look if the site has moved something. The scenario is
