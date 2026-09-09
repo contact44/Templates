@@ -1,0 +1,50 @@
+# Publishes the static preview of Samsung Pulsar on GitHub Pages.
+#
+# The platform itself is not published: it is a Python server that reads a database, runs scenarios and holds the
+# credential vault, so it runs on a workstation, not on Pages. What goes online is docs/preview/index.html, one
+# page built by tools/build_preview.py: the real interface rendered with demonstration data, plus the open space
+# animated by a simulation running in the visitor's browser.
+name: Preview on GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pulsar/**"
+      - "scenarios/**"
+      - "tools/build_preview.py"
+      - ".github/workflows/preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - run: python tools/build_preview.py --out _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

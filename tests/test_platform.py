@@ -1,5 +1,8 @@
+import subprocess
+import sys
 import time
 from datetime import timedelta
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -8,6 +11,8 @@ from pulsar.app import Platform, create_app
 from pulsar.registry import Registry, inspect_source
 from pulsar.scheduler import validate_cron
 from pulsar.stats import dashboard, day_bars, sparkline
+
+ROOT = Path(__file__).resolve().parent.parent
 from pulsar.vault import Vault, mask
 
 DEPOSIT = '''
@@ -200,3 +205,17 @@ def test_demo_mode_seeds_and_runs_inline(settings):
         assert r.headers["location"].startswith("/runs/")
         live = client.get("/api/live").json()
         assert len(live["team"]) == 3 and live["scenarios"][0]["key"]
+
+
+def test_static_preview_is_one_self_contained_page(tmp_path):
+    """tools/build_preview.py must produce a page GitHub Pages can serve on its own: no /static, no /api."""
+    out = tmp_path / "preview"
+    subprocess.run([sys.executable, str(ROOT / "tools" / "build_preview.py"), "--out", str(out)],
+                   check=True, cwd=ROOT)
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert (out / ".nojekyll").exists()
+    assert '"/static' not in page                       # every asset is inlined
+    assert 'fetch("/api/live"' not in page              # the page asks no server
+    assert "PulsarPreview" in page                      # the open space is fed by the simulation instead
+    assert 'id="openspace"' in page
+    assert page.count('class="snap"') >= 6

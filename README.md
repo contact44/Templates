@@ -67,14 +67,31 @@ Action catalogue: `mail.read`, `mail.reply`, `doc.read`, `doc.fill`, `web.browse
 `send`, `archive`, `wait`. An uncaught exception marks the run as failed, with the faulty action and the
 trace in the journal.
 
+## The online preview
+
+The platform runs on a workstation, not on a web host: it holds a database, runs scenarios in the background and
+reads the credential vault of the machine. What can be published is a preview, one HTML page with everything
+inlined:
+
+```bash
+python tools/build_preview.py            # writes docs/preview/index.html
+```
+
+The page stacks the screens of the interface rendered with demonstration data, buttons disabled, and keeps the
+open space alive: `pulsar/static/preview.js` plays a plausible day in the visitor's browser in place of the
+server. `.github/workflows/preview.yml` rebuilds and publishes it on GitHub Pages on every push to `main`
+(enable it once under Settings > Pages, source "GitHub Actions").
+
 ## Layout
 
 ```
 pulsar/         core: app.py (routes), db.py, registry.py, runner.py, team.py, scheduler.py, vault.py, stats.py, templates/, static/
+tools/          build_preview.py (the published page) and the open space artwork scripts
 scenarios/      scenarios shipped with the code (two demos + the SELMS+ extraction skeleton)
 workspace/      local data, outside git: pulsar.db, deposited scenarios and their versions, outputs/, vault
 tests/          pytest
-docs/           framing and previews (in French)
+docs/           framing and decisions; docs/preview/ holds the published page
+.github/        the workflow that publishes the preview on GitHub Pages
 ```
 
 ## Tests

@@ -5,3 +5,5 @@ __pycache__/
 .pytest_cache/
 workspace/*
 !workspace/.gitkeep
+docs/.preview-workspace/
+_site/
