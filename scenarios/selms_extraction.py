@@ -2,9 +2,10 @@
 
 Written from the scenario sheet "SELMS+ Automation, Scheduled Excel Download" (Legal Operations, July 2026):
     0. SELMS+ is opened from the Knox portal (http://w1.samsung.net/portalapp/home), "SELMS+" in the top menu
-    1. that lands on the SELMS+ sign-in page
+    1. that lands on the SELMS+ sign-in check (/secfw/ssoCheck.do)
     2. click "Confirm"
-    3. go to "Contract Mgmt." then "My Contract"
+    3. go to "Contract Mgmt." then "My Contract" (the screens answer in the language of the account, so every
+       label is a parameter holding the spellings it may take, English and French, separated by ";")
     4. Request Date from 01/01/2016 to the end of the current month, "Closed" always "N"
     5. click "Search"
     6. click "Excel Download"
@@ -52,13 +53,27 @@ PARAMS = [
     {"name": "ie_driver_path", "label": "IEDriverServer.exe", "type": "str", "default": "",
      "help": "Where the Internet Explorer driver sits, for example C:\\Pulsar\\IEDriverServer.exe. Leave empty when it "
              "is already on the PATH. See the README to get it."},
-    {"name": "portal_url", "label": "Portal to start from", "type": "str", "default": "",
-     "help": "Leave empty to go straight to the SELMS+ address below, which is what works in Internet Explorer mode. "
-             "Fill it with http://w1.samsung.net/portalapp/home to have the robot click SELMS+ in the portal menu."},
+    {"name": "portal_url", "label": "Portal to start from", "type": "str",
+     "default": "http://w1.samsung.net/portalapp/home",
+     "help": "The road a human takes: the Knox portal, then SELMS+ in the menu. Empty goes straight to the SELMS+ "
+             "address below, which only works when a session is already open."},
     {"name": "portal_link", "label": "Link to click in the portal menu", "type": "str", "default": "SELMS+",
      "help": "As written in the top menu of the portal. Spaces do not matter."},
-    {"name": "url", "label": "SELMS+ address", "type": "str", "default": "http://selmsplus.sec.samsung.net/login.do",
-     "help": "The page the portal link lands on."},
+    {"name": "url", "label": "SELMS+ address", "type": "str",
+     "default": "http://selmsplus.sec.samsung.net/secfw/ssoCheck.do",
+     "help": "The page the portal link lands on: the sign-in check that shows the Confirm button."},
+    {"name": "confirm_label", "label": "Button on the sign-in screen", "type": "str", "default": "Confirm;Confirmer",
+     "help": "Several spellings can be given, separated by ; The robot clicks whichever appears."},
+    {"name": "menu_label", "label": "Top menu holding the contracts", "type": "str",
+     "default": "Contract Mgmt.;Gestion de contrats;Gestion des contrats",
+     "help": "Several spellings separated by ; SELMS+ answers in the language of the account."},
+    {"name": "submenu_label", "label": "Entry to click in that menu", "type": "str",
+     "default": "My Contract;Mes contrats",
+     "help": "Several spellings separated by ; "},
+    {"name": "stop_after", "label": "Stop after", "type": "choice",
+     "choices": ["", "portal", "selms", "confirm", "my_contract", "filters", "search"], "default": "",
+     "help": "Empty runs the whole scenario. Any other value stops the run there, successfully, with the screenshots "
+             "of what was reached: it is how a road is checked one stretch at a time rather than all at once."},
     {"name": "recipients", "label": "Send the file to", "type": "str", "default": "ca.amrat@partner.samsung.com",
      "help": "Several addresses separated by ; "},
     {"name": "start_date", "label": "Request Date, from", "type": "str", "default": "2016-01-01",
@@ -99,6 +114,33 @@ def label_pattern(text: str) -> re.Pattern:
 
 def looks_like(text: str, label: str) -> bool:
     return bool(label_pattern(label).match(text or ""))
+
+
+def spellings(value: str) -> list[str]:
+    """A label parameter holds every spelling the button may carry, separated by ";". SELMS+ answers in the language
+    of the account, so the same menu reads "Contract Mgmt." for one colleague and "Gestion de contrats" for another,
+    and a scenario that knows only one of them stops on a screen the human sees perfectly well."""
+    return [part.strip() for part in (value or "").split(";") if part.strip()]
+
+
+def click_one_of(session, labels: list[str], timeout: float = FIND_TIMEOUT) -> str | None:
+    """Click whichever of these labels shows up first, and return it. It waits for the set, not for each label in
+    turn: trying them one after the other would multiply the timeout by the number of spellings."""
+    deadline = time.monotonic() + timeout
+    while True:
+        for label in labels:
+            if session.click(label, timeout=0):
+                return label
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.5)
+
+
+def hover_one_of(session, labels: list[str]) -> str | None:
+    for label in labels:
+        if session.hover(label):
+            return label
+    return None
 
 
 def export_url(page_html: str, base_url: str) -> str | None:
@@ -535,6 +577,21 @@ def run(ctx):
             except Exception as error:
                 ctx.warn(f"no screenshot for {name}: {error}")
 
+    stop_after = ctx.params["stop_after"].strip()
+    portal_links = spellings(ctx.params["portal_link"])
+    confirm_labels = spellings(ctx.params["confirm_label"])
+    menu_labels = spellings(ctx.params["menu_label"])
+    submenu_labels = spellings(ctx.params["submenu_label"])
+
+    def stop_here(point: str) -> bool:
+        """The run was asked to go only this far. It ends there and counts as a success: checking one stretch of the
+        road at a time is how the rest of it gets written."""
+        if stop_after != point:
+            return False
+        ctx.info(f'Stopping after "{point}", as set in the parameters. The screenshots of what was reached are in '
+                 "the outputs folder of this scenario.")
+        return True
+
     ctx.info(f"Request Date from {start_date} to {end_date:%Y-%m-%d}, Closed = {ctx.params['closed']}")
     session = open_session(ctx)
     try:
@@ -545,11 +602,19 @@ def run(ctx):
                 session.settle()
                 shot(session, "portal")
                 ctx.task_done()
+            if stop_here("portal"):
+                return
 
-            with ctx.step("web.browse", f"Opening {ctx.params['portal_link']} from the portal"):
-                if not session.click(ctx.params["portal_link"]):
-                    ctx.warn(f"\"{ctx.params['portal_link']}\" is not in the portal menu: going to {ctx.params['url']}")
+            with ctx.step("web.browse", f"Opening {portal_links[0]} from the portal"):
+                link = click_one_of(session, portal_links, timeout=8)
+                if link is None and not ctx.params["headless"]:
+                    ctx.warn(f"{portal_links[0]} is not in the portal menu yet, which is what the portal looks like "
+                             f"before a sign-in. Waiting up to {SSO_WAIT} s for it to be done in the window.")
+                    link = click_one_of(session, portal_links, timeout=SSO_WAIT)
+                if link is None:
+                    ctx.warn(f"{portal_links[0]} is not in the portal menu: going straight to {ctx.params['url']}")
                     session.goto(ctx.params["url"])
+                    session.settle()
                 shot(session, "sso_check")
                 ctx.task_done()
         else:
@@ -558,31 +623,42 @@ def run(ctx):
                 session.settle()
                 shot(session, "sso_check")
                 ctx.task_done()
+        if stop_here("selms"):
+            return
 
         with ctx.step("web.browse", "Confirming the sign-in"):
             if len((session.text() or "").strip()) < 40 and ctx.params["driver"] != "edge_ie":
                 raise RuntimeError(
                     f"{session.url()} came back empty. Edge shows SELMS+ in Internet Explorer mode and will not use "
                     "that mode while a robot drives it through remote debugging. Set the driver to edge_ie.")
-            if not session.click("Confirm", timeout=8):
+            if click_one_of(session, confirm_labels, timeout=8) is None:
                 if ctx.params["headless"]:
                     raise RuntimeError("SELMS+ did not show the Confirm button and the run is headless, so nobody can "
                                        "sign in. Set Headless to no and run once to sign in to SSO by hand.")
                 ctx.warn(f"SSO is asking for a sign-in: waiting up to {SSO_WAIT} s for it to be done in the window")
-                if not session.click("Confirm", timeout=SSO_WAIT):
+                if click_one_of(session, confirm_labels, timeout=SSO_WAIT) is None:
                     raise RuntimeError("No sign-in happened in the browser window: the run stops here")
             shot(session, "home")
             ctx.task_done()
+        if stop_here("confirm"):
+            return
 
         with ctx.step("web.browse", "Opening My Contract"):
-            session.hover("Contract Mgmt.")
-            if not session.click("My Contract", timeout=6):
-                if not session.click("Contract Mgmt."):
-                    raise LookupError('The "Contract Mgmt." menu is not on the screen: check the screenshot')
-                if not session.click("My Contract"):
-                    raise LookupError('"My Contract" is not on the screen: check the screenshot')
+            hover_one_of(session, menu_labels)
+            entry = click_one_of(session, submenu_labels, timeout=6)
+            if entry is None:
+                if click_one_of(session, menu_labels, timeout=6) is None:
+                    raise LookupError(f"None of these menus is on the screen: {', '.join(menu_labels)}. Check the "
+                                      "screenshot and write the wording you see into the parameters.")
+                entry = click_one_of(session, submenu_labels, timeout=6)
+                if entry is None:
+                    raise LookupError(f"None of these entries is in the menu: {', '.join(submenu_labels)}. Check the "
+                                      "screenshot and write the wording you see into the parameters.")
+            ctx.info(f'Opened through "{entry}"')
             shot(session, "my_contract")
             ctx.task_done()
+        if stop_here("my_contract"):
+            return
 
         with ctx.step("doc.fill", "Setting the filters"):
             dates = session.fields_next_to("Request Date")
@@ -596,6 +672,8 @@ def run(ctx):
             session.select_field(closed[0], "" if ctx.params["closed"] == "All" else ctx.params["closed"])
             shot(session, "filters")
             ctx.task_done()
+        if stop_here("filters"):
+            return
 
         with ctx.step("web.browse", "Searching"):
             before = session.html()
@@ -605,6 +683,8 @@ def run(ctx):
                 ctx.warn("the results page did not change after the search: carrying on with what is on screen")
             shot(session, "results")
             ctx.task_done()
+        if stop_here("search"):
+            return
 
         with ctx.step("doc.read", "Downloading the Excel export"):
             target = ctx.output_path(f"{stamp}_my_contracts.xlsx")

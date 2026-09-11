@@ -238,6 +238,51 @@ def test_static_preview_is_one_self_contained_page(tmp_path):
     assert page.count('class="snap"') >= 6
 
 
+def test_a_label_holds_every_spelling_the_screen_may_use():
+    """SELMS+ answers in the language of the account: the same menu reads "Contract Mgmt." for one colleague and
+    "Gestion de contrats" for another."""
+    from scenarios.selms_extraction import spellings
+
+    assert spellings("Contract Mgmt.;Gestion de contrats") == ["Contract Mgmt.", "Gestion de contrats"]
+    assert spellings(" My Contract ; ; Mes contrats ") == ["My Contract", "Mes contrats"]
+    assert spellings("") == [] and spellings("Confirm") == ["Confirm"]
+
+
+def test_the_run_stops_where_it_was_asked_to_and_finds_the_english_menu_behind_the_french_one(settings, tmp_path):
+    """Checking one stretch of the road at a time: the run goes to My Contract and stops there, successfully, with
+    its four steps and its screenshots. The menu is named in French first, which the stand-in does not use, so this
+    also proves the second spelling is tried rather than the run failing on the first."""
+    pytest.importorskip("playwright.sync_api")
+    browser = os.environ.get("PULSAR_TEST_BROWSER", "")
+    if not browser and not _chromium_runs():
+        pytest.skip("no browser for Playwright: run `playwright install chromium`, or set PULSAR_TEST_BROWSER")
+    from tests.fixtures.selms.site import start
+
+    server, base = start()
+    try:
+        shutil.copy(ROOT / "scenarios" / "selms_extraction.py", settings.scenarios_dir / "selms_extraction.py")
+        platform = Platform(settings)
+        platform.db.save_config("selms_extraction", True, None, {
+            "driver": "playwright", "portal_url": base + "/portalapp/home", "portal_link": "SELMS+",
+            "url": base + "/secfw/ssoCheck.do", "headless": True, "send_email": False,
+            "browser_path": browser, "ie_driver_path": "", "stop_after": "my_contract",
+            "confirm_label": "Confirmer;Confirm", "menu_label": "Gestion de contrats;Contract Mgmt.",
+            "submenu_label": "Mes contrats;My Contract",
+            "browser_profile": str(tmp_path / "profile"), "start_date": "2016-01-01", "closed": "N",
+            "screenshots": True})
+        run = platform.runner.execute(platform.db.create_run("selms_extraction", "cli"))
+        logs = "\n".join(l["message"] for l in platform.db.logs(run["id"]))
+        assert run["status"] == dbm.STATUS_SUCCESS, logs
+        assert [s["label"] for s in platform.db.steps(run["id"])] == [
+            "Opening the Knox portal", "Opening SELMS+ from the portal", "Confirming the sign-in",
+            "Opening My Contract"]                       # and nothing after: the run stopped where it was told
+        assert "Opened through \"My Contract\"" in logs
+        assert sum(p.suffix == ".png" for p in (settings.workspace / "outputs" / "selms_extraction").glob("*")) == 4
+        platform.db.close()
+    finally:
+        server.shutdown()
+
+
 def test_selms_scenario_drives_the_site_from_the_scenario_sheet(settings, tmp_path):
     """The whole road of the SELMS+ sheet on a stand-in site: portal, new tab, sign-in, menu, filters, search, the
     export fetched over HTTP with the session cookies, and the check of the file."""

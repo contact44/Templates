@@ -89,6 +89,14 @@ Playwright and every Chrome-protocol tool work: under such a tool SELMS+ opens a
 **Internet Explorer driver attached to Edge**, Microsoft's supported route for these sites, which drives the browser
 through IE automation rather than remote debugging. That is the `edge_ie` setting of the scenario, and its default.
 
+Every label the robot clicks is a parameter holding the spellings it may take, separated by `;` — SELMS+ answers
+in the language of the account, so the same menu reads "Contract Mgmt." for one colleague and "Gestion de contrats"
+for another. Put the wording you see on your screen first.
+
+The **Stop after** parameter ends the run at a chosen point, successfully, with the screenshots of what was
+reached: `portal`, `selms`, `confirm`, `my_contract`, `filters`, `search`. It is how the road is checked one
+stretch at a time on the first runs, rather than all at once.
+
 Two things to put in place once on the workstation:
 
 1. Download **IEDriverServer** (32-bit) from the Selenium downloads page, put it somewhere stable such as
