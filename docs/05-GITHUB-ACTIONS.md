@@ -71,6 +71,55 @@ This is worth saying out loud before the runner is installed, because it is the 
 about: putting a GitHub agent on a corporate workstation is a governance decision, not a technical one. Ask before
 registering it.
 
+## When the build cannot reach the network
+
+`preview.yml` rebuilds the page on GitHub's machine: it installs Python, pulls the dependencies and runs
+`tools/build_preview.py`. On a corporate instance any of those three can be refused by the firewall.
+
+There is a fallback that needs none of them. `docs/preview/index.html` is already built and committed, a single
+self-contained file, so it can be served as it is. Replace `preview.yml` with `preview-static.yml`:
+
+```yaml
+name: Preview on GitHub Pages (no build)
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/preview/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/preview
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+Two things to get right. Delete `preview.yml` when you add this one: both deploy to the same place, and run
+together they cancel each other through the `pages` concurrency group. And keep `path: docs/preview` — GitHub's
+"Static HTML" starter template says `path: '.'`, which would publish the whole repository, sources and the SELMS+
+scenario with its portal addresses included.
+
+What it costs: the page stops following the interface. Whoever changes the interface runs
+`python tools/build_preview.py` on their machine and commits the result.
+
 ## Should the schedule live on GitHub?
 
 Probably not. `run-scenario.yml` has its `schedule` block commented out on purpose. GitHub's cron is UTC, it drifts
