@@ -1,0 +1,80 @@
+# Launches a scenario on the workstation, from a button on GitHub.
+#
+# This workflow does NOT run on GitHub's machines. SELMS+ lives on the Samsung network, behind a Knox session, on a
+# site that only opens in Internet Explorer mode: a runner in GitHub's cloud reaches none of that. It runs on a
+# self-hosted runner installed on the workstation that already runs Pulsar. GitHub provides the button, the schedule
+# and the log; the work happens on the PC, exactly as it does when you double-click start.bat.
+#
+# Setting it up is described in docs/05-GITHUB-ACTIONS.md. Three points decide whether it works at all:
+#   - the runner must be started interactively (run.cmd in an open Windows session), not installed as a service:
+#     Internet Explorer mode needs a real desktop;
+#   - it must run under the Windows account that holds the vault password, or ctx.credentials() finds nothing;
+#   - the repository variable PULSAR_WORKSPACE must point at the workspace the platform already uses, so a run
+#     launched from here lands in the same history as a run launched from the dashboard.
+#
+# Nothing produced by the run is uploaded. The exports and the screenshots are contract data: they stay on the PC.
+name: Run a scenario on the workstation
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Which scenario to run"
+        type: choice
+        options: [selms_extraction]
+        default: selms_extraction
+  # Uncomment to let GitHub fire the monthly extraction. Cron here is UTC, not Paris time, and GitHub delays
+  # scheduled jobs under load, so the platform's own scheduler remains the dependable route.
+  # schedule:
+  #   - cron: "0 5 28 * *"
+
+concurrency:
+  group: pulsar-workstation
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: [self-hosted, windows, pulsar]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the workspace is configured
+        shell: cmd
+        run: |
+          if "%PULSAR_WORKSPACE%"=="" (
+            echo Set the repository variable PULSAR_WORKSPACE to the workspace folder on this PC,
+            echo for example C:\Pulsar\workspace. Without it the run would start on an empty database
+            echo and an empty vault. See docs/05-GITHUB-ACTIONS.md.
+            exit /b 1
+          )
+          if not exist "%PULSAR_WORKSPACE%" (
+            echo PULSAR_WORKSPACE points at %PULSAR_WORKSPACE%, which does not exist on this machine.
+            exit /b 1
+          )
+        env:
+          PULSAR_WORKSPACE: ${{ vars.PULSAR_WORKSPACE }}
+
+      - name: Install the platform
+        shell: cmd
+        run: |
+          python -m venv .venv || exit /b 1
+          .venv\Scripts\python.exe -m pip install --upgrade pip --quiet || exit /b 1
+          .venv\Scripts\python.exe -m pip install -e ".[rpa]" --quiet || exit /b 1
+
+      - name: Run the scenario
+        shell: cmd
+        run: .venv\Scripts\pulsar.exe -v run %SCENARIO%
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          PULSAR_WORKSPACE: ${{ vars.PULSAR_WORKSPACE }}
+          PULSAR_TZ: Europe/Paris
+
+      - name: Where to look
+        if: always()
+        shell: cmd
+        run: |
+          echo The run, its task timeline and its journal are in the History tab of the dashboard.
+          echo Screenshots and the Excel export are under %PULSAR_WORKSPACE%\outputs\selms_extraction on this PC.
+        env:
+          PULSAR_WORKSPACE: ${{ vars.PULSAR_WORKSPACE }}

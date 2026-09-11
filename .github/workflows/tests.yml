@@ -1,0 +1,27 @@
+# Runs the test suite on every push and pull request.
+#
+# This is what GitHub's own machines can do for Pulsar: check that the platform still works. They cannot run the
+# SELMS+ scenario, which needs the Samsung network, a Knox session and Internet Explorer mode. That one runs on the
+# workstation, through run-scenario.yml.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      # The end-to-end test drives the stand-in SELMS+ site with a real browser. Without this it skips, and the
+      # test that catches the export being asked for before the search has answered stops catching anything.
+      - run: playwright install --with-deps chromium
+      - run: pytest -q

@@ -141,6 +141,17 @@ open space alive: `pulsar/static/preview.js` plays a plausible day in the visito
 server. `.github/workflows/preview.yml` rebuilds and publishes it on GitHub Pages on every push to `main`
 (enable it once under Settings > Pages, source "GitHub Actions").
 
+## Launching a run from GitHub
+
+GitHub's own machines can run the tests and build the preview. They cannot run the SELMS+ scenario: it needs the
+Samsung network, a Knox session and Internet Explorer mode, three things that only exist on the workstation. So
+`.github/workflows/run-scenario.yml` runs on a **self-hosted runner** installed on that workstation. GitHub gives
+the button and the log; the PC does the work, awake and signed in, exactly as when you double-click `start.bat`.
+
+Nothing the run produces is uploaded: the Excel export and the screenshots are contract data and stay on the PC.
+Registering a GitHub agent on a corporate machine is a decision to take before, not after. Setup and the full
+picture are in `docs/05-GITHUB-ACTIONS.md`.
+
 ## Layout
 
 ```
@@ -151,7 +162,7 @@ workspace/      local data, outside git: pulsar.db, deposited scenarios and thei
 start.bat       one-click start on Windows; start.sh does the same on macOS and Linux
 tests/          pytest
 docs/           framing and decisions; docs/preview/ holds the published page
-.github/        the workflow that publishes the preview on GitHub Pages
+.github/        workflows: tests, the preview on GitHub Pages, a run launched on the workstation
 ```
 
 ## Tests
