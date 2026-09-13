@@ -160,6 +160,20 @@ Nothing the run produces is uploaded: the Excel export and the screenshots are c
 Registering a GitHub agent on a corporate machine is a decision to take before, not after. Setup and the full
 picture are in `docs/05-GITHUB-ACTIONS.md`.
 
+## The showcase page
+
+`tools/build_preview.py` builds the preview for someone at a desk: the seven screens of the platform, stacked.
+`tools/build_showcase.py` answers the other need — one page to show the project from a phone, where the animated
+open space is the argument and everything else is a caption:
+
+```bash
+python tools/build_showcase.py --out showcase.html
+```
+
+It writes a self-contained page that starts at `<title>` and carries no `<html>` wrapper, ready to publish as an
+artifact. Like the preview it holds nothing of the department: the room is played by `pulsar/static/preview.js` in
+the visitor's browser.
+
 ## Layout
 
 ```

@@ -446,7 +446,9 @@ window.Openspace = (function () {
     var self = this;
     this.refresh();
     setInterval(function () { if (!document.hidden) self.refresh(); }, this.interval);
-    function loop(ts) { if (ts - self.lastTick >= TICK) { self.lastTick = ts; self.tick(); self.render(); } requestAnimationFrame(loop); }
+    // scene.paused holds the room still without tearing the loop down: what a Pause control needs, and what
+    // a visitor who asked their system for reduced motion gets on arrival.
+    function loop(ts) { if (!self.paused && ts - self.lastTick >= TICK) { self.lastTick = ts; self.tick(); self.render(); } requestAnimationFrame(loop); }
     requestAnimationFrame(loop);
     return this;
   };
