@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Règles de sécurité Cloud Firestore — Suivi de la saison contractuelle.
+//
+// 1. Remplacez les adresses de la liste ALLOWED_EMAILS par celles des personnes autorisées
+//    (en minuscules), par exemple vous-même et vos deux contract managers.
+// 2. Publiez : console Firebase › Firestore Database › Règles › coller ce fichier › Publier.
+//
+// Toute personne absente de la liste ne peut ni lire ni modifier les données, même si elle
+// parvient à se créer un compte.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isMember() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() in [
+          // ALLOWED_EMAILS — début
+          'prenom.nom@samsung.com',
+          'contract.manager1@samsung.com',
+          'contract.manager2@samsung.com'
+          // ALLOWED_EMAILS — fin
+        ];
+    }
+
+    match /seasons/{seasonId} {
+      allow read, create, update: if isMember();
+      allow delete: if false;
+
+      // Contrats : lecture et écriture par l'équipe, structure minimale contrôlée.
+      match /contracts/{contractId} {
+        allow read, delete: if isMember();
+        allow create, update: if isMember() && request.resource.data.values is map;
+      }
+
+      // Commentaires : jamais modifiés après publication.
+      match /comments/{commentId} {
+        allow read, create, delete: if isMember();
+        allow update: if false;
+      }
+
+      // Journal des modifications : ajout uniquement, aucune modification ni suppression.
+      match /history/{entryId} {
+        allow read, create: if isMember();
+        allow update, delete: if false;
+      }
+
+      // Présence : chacun ne met à jour que sa propre fiche de présence.
+      match /presence/{uid} {
+        allow read: if isMember();
+        allow write: if isMember() && request.auth.uid == uid;
+      }
+    }
+
+    // Tout le reste est fermé.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

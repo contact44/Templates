@@ -36,8 +36,10 @@ export function watchErrors(page, errors) {
 }
 
 let passed = 0; let failed = 0;
-export async function step(name, fn) {
-  try { await fn(); passed++; console.log(`  ✔ ${name}`); } catch (err) { failed++; console.log(`  ✘ ${name}\n    ${err.stack || err}`); }
+export async function step(name, fn, timeoutMs = 90000) {
+  try {
+    await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error(`Étape interrompue après ${timeoutMs / 1000} s`)), timeoutMs))]); passed++; console.log(`  ✔ ${name}`);
+  } catch (err) { failed++; console.log(`  ✘ ${name}\n    ${err.stack || err}`); }
 }
 export function summary() { console.log(`\n${passed} réussi(s), ${failed} échec(s)`); return failed; }
 export function assert(cond, msg) { if (!cond) throw new Error(`Assertion : ${msg}`); }

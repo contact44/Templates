@@ -88,7 +88,6 @@ await step('Statut via la liste déroulante + automatisation date de signature',
 });
 
 await step('Annulation (Ctrl+Z) de la dernière modification', async () => {
-  await page.click('.grid-scroll', { position: { x: 5, y: 5 } }).catch(() => {});
   await page.focus('.grid-scroll');
   await page.keyboard.press('Control+z');
   await settle();
@@ -195,9 +194,7 @@ await step('Sélection multiple et modification groupée', async () => {
   await page.click('tbody tr[data-id]:nth-child(1) input[data-row]');
   await page.click('tbody tr[data-id]:nth-child(2) input[data-row]');
   await page.waitForSelector('.bulkbar:not([hidden])');
-  console.log('DEBUG rows', await page.$$eval('tbody tr[data-id]', (r) => r.slice(0, 3).map((x) => x.querySelector('.client-cell')?.textContent.trim() + ':' + x.classList.contains('selected'))), await page.textContent('.bulkbar'));
   await page.click('.bulkbar [data-bulk="priorite"]');
-  console.log('DEBUG picker', await page.$$eval('.picker-opt', (x) => x.map((e) => e.textContent)));
   await page.click('.picker-opt:has-text("P2 – Haute")');
   await settle();
   const a = await contractByClient('Alto Distribution');
