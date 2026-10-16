@@ -993,7 +993,7 @@ td.sel { position: relative; }
 .ms-table .et-head, .ms-table .et-row { grid-template-columns: minmax(180px, 1.4fr) 150px 220px minmax(160px, 1.4fr) 36px; }
 .team-table .et-head, .team-table .et-row { grid-template-columns: 34px minmax(150px, 1fr) minmax(190px, 1.2fr) minmax(120px, .8fr) 74px 34px 36px; min-width: 760px; }
 .list-table .et-head, .list-table .et-row { grid-template-columns: 60px 56px minmax(200px, 1fr) 110px 36px; }
-.list-table.is-status .et-head, .list-table.is-status .et-row { grid-template-columns: 60px 56px minmax(160px, 1fr) 130px 104px 160px 86px 36px; min-width: 820px; }
+.list-table.is-status .et-head, .list-table.is-status .et-row { grid-template-columns: 60px 52px minmax(140px, 1fr) 124px 96px 150px 82px 36px; min-width: 790px; }
 .edit-table .swatch-btn { justify-self: center; }
 .col-table .et-head, .col-table .et-row { grid-template-columns: 60px minmax(150px, 1fr) 150px 140px 150px 50px 50px 36px; min-width: 840px; }
 .order-btns { display: inline-flex; }
