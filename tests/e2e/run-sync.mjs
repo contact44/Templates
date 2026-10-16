@@ -64,6 +64,7 @@ await step('Connexion des deux utilisateurs et création de la saison', async ()
 
 await step('Chargement de la démonstration par A, visible chez B', async () => {
   await A.page.click('button[data-act="demo"]');
+  await A.page.click('#confirm-ok');
   const r = await until(B.page, (s) => s.state.list.length === 42, null, '42 contrats chez B');
   console.log(`    (reçu chez B en ${r.ms} ms)`);
   const team = await get(B.page, (s) => s.state.settings.team.map((m) => m.name));
