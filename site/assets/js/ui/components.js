@@ -6,14 +6,15 @@ import { popover } from './overlay.js';
 import { LEVEL_LABEL } from '../core/compute.js';
 import { listOptions, memberById, STAGES } from '../core/schema.js';
 import {
-  addDays, esc, fmtDate, fmtDateTime, fmtNumber, fmtRelative, initials, isEmpty, norm, parseDateInput, todayISO, diffDays,
+  addDays, esc, fmtDate, inkOn, fmtDateTime, fmtNumber, fmtRelative, initials, isEmpty, norm, parseDateInput, todayISO, diffDays,
   startOfWeek, weekday,
 } from '../core/utils.js';
 
 export function avatar(member, { size = 'sm', title = true } = {}) {
   if (!member) return `<span class="avatar avatar-${size} avatar-empty" ${title ? 'data-tip="Non assigné"' : ''}>${icon('user')}</span>`;
   const ini = member.initials || initials(member.name);
-  return `<span class="avatar avatar-${size}" style="--c:${esc(member.color || '#1428a0')}" ${title ? `data-tip="${esc(member.name)}"` : ''}>${esc(ini.slice(0, 3))}</span>`;
+  const bg = member.color || '#1428a0';
+  return `<span class="avatar avatar-${size}" style="--c:${esc(bg)};color:${inkOn(bg)}" ${title ? `data-tip="${esc(member.name)}"` : ''}>${esc(ini.slice(0, 3))}</span>`;
 }
 
 export function optionColor(settings, listKey, value) {

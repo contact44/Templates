@@ -28,8 +28,8 @@ export function mount(el, ctx) {
     <div class="toolbar-group">
       <button class="btn btn-ghost btn-sm" data-act="group">${icon('layers')}<span class="lbl-group">Regrouper</span></button>
       <button class="btn btn-ghost btn-sm" data-act="columns">${icon('columns')}<span>Colonnes</span></button>
-      <button class="btn btn-ghost btn-sm" data-act="density" data-tip="Densité d’affichage">${icon('rows')}</button>
-      <button class="btn btn-ghost btn-sm" data-act="import" data-tip="Importer un fichier Excel ou un collage">${icon('upload')}<span class="hide-md">Importer</span></button>
+      <button class="btn btn-ghost btn-sm" data-act="density" data-tip="Densité d’affichage" aria-label="Changer la densité d’affichage">${icon('rows')}</button>
+      <button class="btn btn-ghost btn-sm" data-act="import" data-tip="Importer un fichier Excel ou un collage" aria-label="Importer">${icon('upload')}<span class="hide-md">Importer</span></button>
       <button class="btn btn-secondary btn-sm" data-act="export">${icon('download')}<span>Exporter</span></button>
     </div>`;
   const fb = filterBar(ctx, { quick: true, extra });
@@ -43,8 +43,8 @@ export function mount(el, ctx) {
   const card = document.createElement('div');
   card.className = 'card grid-card';
   card.innerHTML = `
-    <div class="grid-scroll" tabindex="0" role="grid" aria-label="Tableau de suivi des contrats" aria-multiselectable="true">
-      <table class="grid"><colgroup></colgroup><thead></thead><tbody></tbody></table>
+    <div class="grid-scroll" tabindex="0" role="region" aria-label="Tableau de suivi des contrats (flèches pour se déplacer, Entrée pour modifier)">
+      <table class="grid" aria-label="Contrats"><colgroup></colgroup><thead></thead><tbody></tbody></table>
     </div>
     <div class="grid-foot"><button class="btn btn-ghost btn-sm" data-act="add">${icon('plus')}<span>Nouveau contrat</span></button><span class="grid-stats" aria-live="polite"></span><span class="grid-hint">Double-clic ou Entrée pour modifier · Ctrl+C / Ctrl+V avec Excel · Ctrl+Z pour annuler</span></div>`;
   page.appendChild(card);

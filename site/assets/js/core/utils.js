@@ -352,3 +352,21 @@ export function toCSV(rows) {
 }
 
 export function pluralize(n, one, many) { return `${fmtNumber(n)} ${n > 1 ? many : one}`; }
+
+/* ------------------------------------------------------------- Couleurs */
+
+function luminance(hex) {
+  const h = String(hex || '').replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h.slice(0, 6), 16);
+  if (Number.isNaN(n)) return 0;
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+
+/** Couleur de texte lisible (blanc ou quasi-noir) sur un fond de couleur donnée. */
+export function inkOn(hex) {
+  const L = luminance(hex);
+  const white = 1.05 / (L + 0.05);
+  const black = (L + 0.05) / 0.05;
+  return white >= 4.5 || white >= black ? '#ffffff' : '#111214';
+}

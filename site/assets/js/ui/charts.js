@@ -1,7 +1,7 @@
 // Graphiques du tableau de bord : barres horizontales, barres empilées, courbe de signatures,
 // frise de la saison. Marques fines, grille discrète, infobulles au survol et au clavier.
 
-import { esc, fmtDate, fmtNumber, diffDays, isoToUTC, utcToISO } from '../core/utils.js';
+import { esc, fmtDate, fmtNumber, diffDays, inkOn, isoToUTC, utcToISO } from '../core/utils.js';
 
 /* ------------------------------------------------------- Infobulle unique */
 
@@ -92,7 +92,7 @@ export function stackedHTML(groups, segments, { showLegend = true, mode = 'count
       if (!n) return '';
       const share = g.total ? n / g.total : 0;
       const rows2 = [{ value: `${n} contrat${n > 1 ? 's' : ''}`, label: s.label, color: s.color }, { value: `${Math.round(share * 100)} %`, label: `de ${g.label}` }];
-      return `<span class="seg" style="flex:${n} 1 0;--c:${esc(s.color)}" tabindex="0" data-tt="${tip(g.label, rows2)}"><span class="seg-label">${n}</span></span>`;
+      return `<span class="seg" style="flex:${n} 1 0;--c:${esc(s.color)}" tabindex="0" data-tt="${tip(g.label, rows2)}"><span class="seg-label" style="color:${inkOn(s.color)}">${n}</span></span>`;
     }).join('');
     const done = g.counts.done || 0;
     return `<div class="stack-row" data-key="${esc(g.key)}">
@@ -165,7 +165,7 @@ export function renderBurnup(el, series, { marks = [], today, colors }) {
       ${today >= series.start && today <= series.end ? `<line class="today-line" x1="${x(today)}" x2="${x(today)}" y1="${m.t}" y2="${y(0)}"/>` : ''}
       ${last ? `<circle class="end-dot" cx="${x(last.date)}" cy="${y(last.value)}" r="4.5" style="fill:${colors.actual}"/><text class="end-label" x="${x(last.date) + 9}" y="${y(last.value) - 8}">${last.value}</text>` : ''}
       <line class="crosshair" x1="0" x2="0" y1="${m.t}" y2="${y(0)}" visibility="hidden"/>
-      <rect class="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" aria-label="Survoler pour lire les valeurs"/>
+      <rect class="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" role="img" aria-label="Zone de lecture des valeurs : survolez ou parcourez au clavier"/>
     </svg>`;
 
   const svg = el.querySelector('svg');
