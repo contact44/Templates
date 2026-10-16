@@ -94,6 +94,7 @@ export function startApp(root, store, { config }) {
     return { routeId: routeId || store.state.prefs.lastView || 'tableau-de-bord', sub, params };
   }
 
+  let pendingContract = null;
   function route() {
     const { routeId, sub, params } = parseHash();
     const r = ROUTES.find((x) => x.id === routeId) || ROUTES[0];
@@ -116,7 +117,9 @@ export function startApp(root, store, { config }) {
       current.route?.({ sub, params });
     }
     const c = params.get('c');
-    if (c && c !== currentContractId()) openContract(ctx, c, { fromRoute: true });
+    // Lien direct vers une fiche : avec la base partagée, les contrats arrivent après l'affichage de la page.
+    pendingContract = c && !store.getContract(c) && !store.state.loaded.contracts ? c : null;
+    if (c && c !== currentContractId() && !pendingContract) openContract(ctx, c, { fromRoute: true });
     if (!c && currentContractId()) closeContract({ fromRoute: true });
   }
 
@@ -318,6 +321,11 @@ export function startApp(root, store, { config }) {
     if (!alive()) return;
     current?.update?.('data', payload);
     updateDrawer(ctx, 'data', payload);
+    if (pendingContract && (store.getContract(pendingContract) || store.state.loaded.contracts)) {
+      const id = pendingContract;
+      pendingContract = null;
+      if (id !== currentContractId()) openContract(ctx, id, { fromRoute: true });
+    }
     throttledChrome();
   });
   store.on('settings', () => { current?.update?.('settings'); });

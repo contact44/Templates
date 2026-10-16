@@ -99,6 +99,7 @@ export function mount(el, ctx) {
     board.querySelectorAll('.drop-target').forEach((x) => x.classList.remove('drop-target'));
     board.classList.remove('is-dragging');
     dragId = null;
+    schedule();
   });
   board.addEventListener('dragover', (e) => {
     if (dragId) {

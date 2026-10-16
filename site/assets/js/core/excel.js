@@ -5,7 +5,7 @@
 import { columnByKey, listOptions, milestoneByRole, SWATCHES } from './schema.js';
 import { byStatus, breakdown, coerceValue, displayValue, kpis } from './compute.js';
 import {
-  fmtDate, fmtDateTime, isEmpty, isISODate, norm, parseDateInput, slugKey, toCSV, todayISO,
+  fmtDate, fmtDateTime, isEmpty, isISODate, norm, parseDateInput, parseNumberInput, slugKey, toCSV, todayISO,
 } from './utils.js';
 
 let loading = null;
@@ -180,8 +180,9 @@ export function inferType(values) {
   const vals = values.map((v) => (v instanceof Date ? v : typeof v === 'string' ? v.trim() : v)).filter((v) => v !== '' && v !== null && v !== undefined);
   if (!vals.length) return 'text';
   const ratio = (fn) => vals.filter(fn).length / vals.length;
+  // Les nombres d'abord : « 2.5 » ou « 12,5 » ne sont pas des dates.
+  if (ratio((v) => typeof v === 'number' || (typeof v === 'string' && /\d/.test(v) && parseNumberInput(v) !== null)) > 0.8) return 'number';
   if (ratio((v) => v instanceof Date || (typeof v === 'string' && parseDateInput(v) && /\d/.test(v) && /[/.-]/.test(v))) > 0.7) return 'date';
-  if (ratio((v) => typeof v === 'number' || (typeof v === 'string' && /^-?[\d\s ]+([.,]\d+)?$/.test(v))) > 0.8) return 'number';
   if (ratio((v) => typeof v === 'boolean' || ['oui', 'non', 'x', 'yes', 'no'].includes(norm(v))) > 0.8) return 'checkbox';
   if (ratio((v) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(String(v))) > 0.7) return 'email';
   if (ratio((v) => /^(https?:\/\/|www\.)/i.test(String(v))) > 0.7) return 'url';
@@ -310,7 +311,7 @@ export async function exportWorkbook({ settings, contracts, derived, history = [
     cols.forEach((col, i) => {
       const cell = row.getCell(i + 1);
       const v = c.values[col.key];
-      if (col.type === 'date') { cell.value = isoToExcelDate(v); cell.numFmt = 'dd/mm/yyyy'; } else if (col.type === 'number') { cell.value = isEmpty(v) ? null : Number(v); cell.numFmt = '#,##0.##'; } else if (col.type === 'checkbox') cell.value = v ? 'Oui' : '';
+      if (col.type === 'date') { cell.value = isoToExcelDate(v); cell.numFmt = 'dd/mm/yyyy'; } else if (col.type === 'number') { cell.value = isEmpty(v) ? null : Number(v); cell.numFmt = Number.isInteger(Number(v)) ? '#,##0' : '#,##0.0#'; } else if (col.type === 'checkbox') cell.value = v ? 'Oui' : '';
       else if (col.type === 'computed' && col.computed === 'progress') { cell.value = d?.progress === null || d?.progress === undefined ? null : d.progress / 100; cell.numFmt = '0%'; } else if (col.type === 'url' && !isEmpty(v)) cell.value = { text: String(v), hyperlink: String(v) };
       else cell.value = displayValue(s, c, col, d) || null;
       cell.alignment = { vertical: 'top', wrapText: col.type === 'longtext' || (col.type === 'computed' && col.computed === 'alerts') };

@@ -7,7 +7,7 @@ import { menu, toast } from '../ui/overlay.js';
 import { timelineHTML } from '../ui/charts.js';
 import { filterBar } from './filterbar.js';
 import { agenda, stageLabel } from '../core/compute.js';
-import { STAGES } from '../core/schema.js';
+import { listOptions, STAGES } from '../core/schema.js';
 import {
   addDays, diffDays, esc, fmtCountdown, fmtDate, isoToUTC, utcToISO,
 } from '../core/utils.js';
@@ -111,14 +111,26 @@ export function mount(el, ctx) {
   body.addEventListener('click', (e) => {
     const pp = e.target.closest('[data-postpone]');
     if (pp) { e.stopPropagation(); postpone(pp, pp.dataset.postpone); return; }
-    if (e.target.closest('[data-act="no-date"]')) { store.setFilters({ quick: 'active' }); ctx.navigate('suivi'); store.setPrefs({ sort: [{ key: 'echeance', dir: 1 }] }); return; }
+    if (e.target.closest('[data-act="no-date"]')) { showUndated(); return; }
     const o = e.target.closest('[data-open]');
     if (o) ctx.openContract(o.dataset.open);
   });
   body.addEventListener('keydown', (e) => {
+    // Seulement sur la ligne elle-même : Entrée sur le bouton « Reporter » garde son propre comportement.
     const o = e.target.closest('.agenda-item');
-    if (o && e.key === 'Enter') ctx.openContract(o.dataset.open);
+    if (o && e.target === o && e.key === 'Enter') ctx.openContract(o.dataset.open);
   });
+
+  /** Ouvre le suivi sur les contrats en cours ou bloqués sans échéance (ceux que l'agenda ne peut pas placer). */
+  function showUndated() {
+    const s = store.state.settings;
+    const f = store.state.prefs.filters || {};
+    let statuses = listOptions(s, 'statut').filter((o) => ['active', 'blocked'].includes(o.stage || 'active')).map((o) => o.value);
+    if (f.fields?.statut?.length) statuses = statuses.filter((v) => f.fields.statut.includes(v));
+    store.setFilters({ quick: '', fields: { ...(f.fields || {}), statut: statuses } });
+    store.setPrefs({ columnFilters: { ...(store.state.prefs.columnFilters || {}), echeance: [''] } });
+    ctx.navigate('suivi');
+  }
 
   function postpone(anchor, id) {
     const c = store.getContract(id);

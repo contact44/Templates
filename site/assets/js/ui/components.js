@@ -2,11 +2,12 @@
 // rendu d'une cellule, sélecteur de valeurs, champs de formulaire.
 
 import { icon } from './icons.js';
-import { popover } from './overlay.js';
+import { popover, toast } from './overlay.js';
 import { LEVEL_LABEL } from '../core/compute.js';
 import { listOptions, memberById, STAGES } from '../core/schema.js';
 import {
-  addDays, esc, fmtDate, inkOn, fmtDateTime, fmtNumber, fmtRelative, initials, isEmpty, norm, parseDateInput, todayISO, diffDays,
+  addDays, esc, fmtDate, inkOn, fmtDateTime, fmtNumber, fmtRelative, initials, isEmpty, norm, parseDateInput, parseNumberInput,
+  todayISO, diffDays,
   startOfWeek, weekday,
 } from '../core/utils.js';
 
@@ -283,8 +284,15 @@ export function calendarPopover(anchor, { value = null, onPick, onClose, withInp
     if (k === 'ArrowRight') { e.preventDefault(); moveFocus(1); }
     if (k === 'ArrowUp') { e.preventDefault(); moveFocus(-7); }
     if (k === 'ArrowDown') { e.preventDefault(); moveFocus(7); }
-    if (k === 'PageUp') { e.preventDefault(); moveFocus(-28); }
-    if (k === 'PageDown') { e.preventDefault(); moveFocus(28); }
+    if (k === 'PageUp' || k === 'PageDown') {
+      // Mois précédent / suivant, même jour (ramené au dernier jour du mois si besoin), comme les sélecteurs natifs.
+      e.preventDefault();
+      const [y, m, d] = focus.split('-').map(Number);
+      const t = new Date(Date.UTC(y, m - 1 + (k === 'PageUp' ? -1 : 1), 1));
+      const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+      const target = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+      moveFocus(diffDays(focus, target));
+    }
   });
   input?.addEventListener('input', () => {
     const iso = parseDateInput(input.value);
@@ -441,7 +449,13 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
       const parse = () => {
         const t = inp.value.trim();
         if (!t) return null;
-        if (col.type === 'number') { const n = Number(t.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : current; }
+        if (col.type === 'number') {
+          const n = parseNumberInput(t);
+          if (n !== null) return n;
+          inp.value = isEmpty(current) ? '' : String(current).replace('.', ',');
+          toast(`« ${t} » n'est pas un nombre : valeur inchangée.`, { type: 'warning' });
+          return current;
+        }
         return t;
       };
       inp.addEventListener('change', () => commit(parse()));

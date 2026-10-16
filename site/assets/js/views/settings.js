@@ -514,16 +514,18 @@ export function mount(el, ctx, { sub } = {}) {
     o[parts[parts.length - 1]] = value;
   }
 
-  el.addEventListener('click', async (e) => {
+  // Écouteurs posés sur les éléments de la vue (et non sur #main, partagé entre les vues).
+  el.querySelector('.page-settings').addEventListener('click', async (e) => {
     const sec = e.target.closest('[data-sec]');
     if (sec && dirty && sec.dataset.sec !== section) {
       e.preventDefault();
       const ok = await confirmDialog({ title: 'Modifications non enregistrées', message: 'Enregistrer les modifications de cette section avant de changer de section ?', confirmLabel: 'Enregistrer', cancelLabel: 'Ignorer' });
       if (ok) await save(); else resetDraft();
       ctx.navigate(`parametres/${sec.dataset.sec}`);
-      return;
     }
-    const act = e.target.closest('.savebar [data-act]')?.dataset.act;
+  });
+  saveBar.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'save') save();
     if (act === 'discard') { resetDraft(); render(); }
   });

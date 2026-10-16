@@ -89,7 +89,7 @@ export function mount(el, ctx) {
     const groups = breakdown(s, list, derived, dimKey);
     const series = signatureSeries(s, list, derived, today);
     const ag = agenda(s, list, derived, today);
-    const soon = [...ag.overdue, ...ag.week, ...ag.next].filter((x) => x.date <= addDays(today, 14)).slice(0, 8);
+    const soon = [...ag.overdue, ...ag.week, ...ag.next, ...ag.later].filter((x) => x.date <= addDays(today, 14)).slice(0, 8);
     const alerts = list
       .map((c) => ({ c, d: derived.get(c.id) }))
       .filter(({ d }) => d.alerts.some((a) => a.level === 'critical' || a.level === 'serious'))

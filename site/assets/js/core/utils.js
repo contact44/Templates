@@ -175,7 +175,8 @@ export function parseDateInput(value) {
     return `${value.getUTCFullYear()}-${pad2(value.getUTCMonth() + 1)}-${pad2(value.getUTCDate())}`;
   }
   if (typeof value === 'number') {
-    if (value > 20000 && value < 90000) return utcToISO(Date.UTC(1899, 11, 30) + Math.round(value) * 86400000);
+    // Numéro de série Excel : la partie décimale est l'heure, on ne garde que le jour.
+    if (value > 20000 && value < 90000) return utcToISO(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
     return null;
   }
   const s = String(value).trim();
@@ -191,8 +192,9 @@ export function parseDateInput(value) {
   m = norm(s).match(/^(\d{1,2})(?:er)?\s+([a-z.]+)\s+(\d{4})$/);
   if (m) {
     const mon = norm(m[2]).replace('.', '');
-    const idx = MONTHS_LONG.findIndex((x) => norm(x).startsWith(mon.slice(0, 3)));
-    if (idx >= 0) return validYMD(+m[3], idx + 1, +m[1]);
+    // « juil. » et « juin » partagent trois lettres : l'abréviation doit désigner un seul mois.
+    const hits = mon.length >= 3 ? MONTHS_LONG.map((x, i) => (norm(x).startsWith(mon) ? i : -1)).filter((i) => i >= 0) : [];
+    if (hits.length === 1) return validYMD(+m[3], hits[0] + 1, +m[1]);
   }
   if (/^\d{5}(\.\d+)?$/.test(s)) return parseDateInput(Number(s));
   return null;
@@ -229,11 +231,34 @@ export function fmtPct(ratio) {
   return `${Math.round(ratio * 100)} %`;
 }
 
+/**
+ * Lit un nombre saisi à la française ou copié d'Excel : « 1 250,5 », « 1.250,5 », « 1,250.5 », « 12,5 k€ », « 8 % ».
+ * Les unités sont décoratives (la colonne porte déjà la sienne, par exemple « CA N-1 (k€) ») : elles sont retirées
+ * sans multiplier. Renvoie null si le texte n'est pas un nombre.
+ */
 export function parseNumberInput(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  const s = String(value).replace(/\s| | |k€|€|eur/gi, '').replace(',', '.');
+  let s = String(value).replace(/[\s\u00a0\u202f']/g, '').replace(/(k?€|k?eur(os?)?|%)$/i, '');
   if (!s) return null;
+  const commas = (s.match(/,/g) || []).length;
+  const dots = (s.match(/\./g) || []).length;
+  // Séparateur décimal : le dernier des deux s'ils sont mélangés, sinon celui qui n'apparaît qu'une fois.
+  let dec = null;
+  if (commas && dots) dec = s.lastIndexOf(',') > s.lastIndexOf('.') ? ',' : '.';
+  else if (commas === 1) dec = ',';
+  else if (dots === 1) dec = '.';
+  const thou = dec ? (dec === ',' ? '.' : ',') : (commas ? ',' : '.');
+  const at = dec ? s.lastIndexOf(dec) : -1;
+  let int = at >= 0 ? s.slice(0, at) : s;
+  const frac = at >= 0 ? s.slice(at + 1) : '';
+  if (int.includes(thou)) {
+    // Milliers par groupes de trois chiffres uniquement (« 01.03.2027 » n'est pas un nombre).
+    if (!new RegExp(`^[-+]?\\d{1,3}(\\${thou}\\d{3})+$`).test(int)) return null;
+    int = int.split(thou).join('');
+  }
+  s = frac ? `${int}.${frac}` : int;
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
   const v = Number(s);
   return Number.isFinite(v) ? v : null;
 }

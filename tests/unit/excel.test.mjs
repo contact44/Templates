@@ -18,6 +18,8 @@ test('correspondance automatique des intitulés usuels', () => {
 test('type deviné pour les nouvelles colonnes', () => {
   assert.equal(inferType(['01/12/2026', '15/01/2027', '']), 'date');
   assert.equal(inferType(['12', '1 200,5', '3']), 'number');
+  assert.equal(inferType(['2.5', '3.5', '1.5', '4.5']), 'number');
+  assert.equal(inferType(['01.03.2027', '15.01.2027', '01.12.2026']), 'date');
   assert.equal(inferType(['Oui', 'Non', 'oui', 'non']), 'checkbox');
   assert.equal(inferType(['A', 'B', 'A', 'B', 'A', 'C']), 'select');
   assert.equal(inferType(['https://a.fr', 'www.b.fr']), 'url');

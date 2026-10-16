@@ -503,6 +503,10 @@ export function mount(el, ctx) {
       commit: () => {
         const v = parse();
         if (col.key === 'client' && isEmpty(v)) { toast('Le nom du client est obligatoire.', { type: 'warning' }); return; }
+        if (col.type === 'number' && v === null && input.value.trim()) {
+          toast(`« ${input.value.trim()} » n'est pas un nombre : valeur inchangée.`, { type: 'warning' });
+          return;
+        }
         store.updateField(contract.id, col.key, v);
       },
     };

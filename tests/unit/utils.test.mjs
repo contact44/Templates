@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addDays, diffDays, fmtCountdown, fmtDate, fmtMoneyK, norm, parseDateInput, parseTSV, setToday, slugKey, startOfWeek, toCSV, toTSV,
+  addDays, diffDays, fmtCountdown, fmtDate, fmtMoneyK, norm, parseDateInput, parseNumberInput, parseTSV, setToday, slugKey, startOfWeek, toCSV, toTSV,
 } from '../../site/assets/js/core/utils.js';
 
 setToday('2026-10-16');
@@ -48,4 +48,26 @@ test('presse-papiers Excel : TSV avec guillemets et retours à la ligne', () => 
   assert.deepEqual(rows, [['Client', 'Commentaire'], ['Alto', 'Ligne 1\nLigne 2'], ['Brio "B"', '']]);
   assert.equal(toTSV([['a', 'b\tc'], ['d"e', '']]), 'a\t"b\tc"\n"d""e"\t');
   assert.ok(toCSV([['a;b', 'c']]).startsWith('﻿"a;b";c'));
+});
+
+test('dates : mois abrégés sans ambiguïté, numéros de série Excel avec heure', () => {
+  assert.equal(parseDateInput('1 juillet 2026'), '2026-07-01');
+  assert.equal(parseDateInput('3 juin 2026'), '2026-06-03');
+  assert.equal(parseDateInput('14 juil. 2026'), '2026-07-14');
+  assert.equal(parseDateInput('1er sept 2026'), '2026-09-01');
+  assert.equal(parseDateInput('1 jui 2026'), null);
+  assert.equal(parseDateInput(46000.75), '2025-12-09');
+});
+
+test('nombres : formats français et Excel', () => {
+  assert.equal(parseNumberInput('1 250,5'), 1250.5);
+  assert.equal(parseNumberInput('1.250,5'), 1250.5);
+  assert.equal(parseNumberInput('1,250.5'), 1250.5);
+  assert.equal(parseNumberInput('1.250.000'), 1250000);
+  assert.equal(parseNumberInput('12,5 k€'), 12.5);
+  assert.equal(parseNumberInput('8 %'), 8);
+  assert.equal(parseNumberInput('-3,2'), -3.2);
+  assert.equal(parseNumberInput('01.03.2027'), null);
+  assert.equal(parseNumberInput('12a'), null);
+  assert.equal(parseNumberInput('abc'), null);
 });

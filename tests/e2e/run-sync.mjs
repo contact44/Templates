@@ -245,6 +245,15 @@ await step('Journal complet : pagination sans perte (entrées simultanées)', as
   eq(all, direct, 'toutes les entrées du journal');
 });
 
+await step('Lien direct vers une fiche : ouverte après le chargement des données', async () => {
+  const { id, client } = await get(A.page, (s) => { const c = s.state.list.find((x) => x.values.client); return { id: c.id, client: c.values.client }; });
+  await B.page.goto(`${url}#/suivi?c=${encodeURIComponent(id)}`);
+  await B.page.waitForSelector('#drawer-root.open .drawer-title', { timeout: 15000 });
+  eq(await B.page.inputValue('.drawer-title'), client, 'fiche du lien ouverte');
+  assert(!(await B.page.$('.toast:has-text("n’existe plus")')), 'pas de faux message');
+  await B.page.keyboard.press('Escape');
+});
+
 await step('Compte non autorisé : accès refusé, aucune donnée lue', async () => {
   const C = await openAs('intrus@test.local');
   await C.page.waitForSelector('.denied', { timeout: 15000 });

@@ -367,7 +367,8 @@ export async function createFirebaseBackend(config) {
       const b = batches();
       oldContracts.forEach((d) => { pendingDeletes.add(d.id); b.get().delete(d.ref); });
       oldComments.forEach((d) => b.get().delete(d.ref));
-      b.get().set(seasonRef, sanitize({ settings, counter }), { merge: true });
+      // mergeFields : les paramètres sont remplacés en entier (une liste ou une colonne supprimée disparaît).
+      b.get().set(seasonRef, sanitize({ settings, counter }), { mergeFields: ['settings', 'counter'] });
       const actor = currentUser || { uid: 'inconnu', name: 'Utilisateur' };
       for (const c of contracts) {
         pendingDeletes.delete(c.id);

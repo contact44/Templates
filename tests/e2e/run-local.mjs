@@ -234,6 +234,22 @@ await step('Échap annule la saisie d’un texte long', async () => {
   eq(await store((s, i) => s.getContract(i).values.commentaires ?? null, id), before, 'valeur inchangée');
 });
 
+await step('Nombres : saisie à la française acceptée, texte invalide refusé', async () => {
+  const c = await page.getAttribute('th[data-key="ca"]', 'data-c');
+  const row = page.locator('tbody tr[data-id]').first();
+  const id = await row.getAttribute('data-id');
+  await row.locator(`td[data-c="${c}"]`).click();
+  await page.keyboard.type('1 250,5');
+  await page.keyboard.press('Enter');
+  await settle();
+  eq(await store((s, i) => s.getContract(i).values.ca, id), 1250.5, 'nombre lu à la française');
+  await row.locator(`td[data-c="${c}"]`).click();
+  await page.keyboard.type('environ 12');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.toast:has-text("n\'est pas un nombre")');
+  eq(await store((s, i) => s.getContract(i).values.ca, id), 1250.5, 'valeur conservée');
+});
+
 await step('Fiche contrat : champs, commentaire, historique', async () => {
   await page.hover('tbody tr[data-id]:nth-child(1)');
   await page.click('tbody tr[data-id]:nth-child(1) .open-btn');
@@ -300,6 +316,19 @@ await step('Échéancier : report d’une échéance', async () => {
   const due = await store((s, i) => s.getContract(i).values.echeance, id);
   eq(due, '2026-10-23', 'échéance reportée (aujourd’hui + 7 j)');
   assert((await page.$$('.g-row')).length > 40, 'diagramme de Gantt');
+});
+
+await step('Échéancier : « Les afficher » liste les contrats en cours sans échéance', async () => {
+  await page.click('a[data-route="echeancier"]');
+  await page.waitForSelector('[data-act="no-date"]');
+  const expected = await store((s) => s.state.list.filter((c) => !c.values.echeance && ['active', 'blocked'].includes(s.state.derived.get(c.id)?.stage)).length);
+  await page.click('[data-act="no-date"]');
+  await page.waitForSelector('.grid tbody tr[data-id]');
+  await settle();
+  eq(await page.locator('.grid tbody tr[data-id]').count(), expected, 'contrats sans échéance');
+  await page.click('th[data-key="echeance"] .th-filter.on').catch(() => { throw new Error('filtre de colonne visible'); });
+  await page.keyboard.press('Escape');
+  await store((s) => { s.setFilters({ search: '', fields: {}, quick: '' }); s.setPrefs({ columnFilters: {} }); });
 });
 
 await step('Paramètres : renommer une valeur met à jour les contrats', async () => {

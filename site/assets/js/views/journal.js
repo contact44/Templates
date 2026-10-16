@@ -93,13 +93,14 @@ export function mount(el, ctx) {
       : !exhausted ? `<button class="btn btn-ghost" data-act="older">Charger les entrées plus anciennes</button>` : `<span class="muted small">${entries.length} entrée(s)</span>`;
   }
 
-  el.addEventListener('change', (e) => {
+  const pageEl = el.querySelector('.page-journal');
+  pageEl.addEventListener('change', (e) => {
     const k = e.target.dataset.f;
     if (k) { f[k] = e.target.value; limit = 200; render(); }
   });
   const onSearch = debounce((v) => { f.q = v; limit = 200; render(); }, 180);
   el.querySelector('input[type="search"]').addEventListener('input', (e) => onSearch(e.target.value));
-  el.addEventListener('click', async (e) => {
+  pageEl.addEventListener('click', async (e) => {
     const o = e.target.closest('[data-open]');
     if (o) { ctx.openContract(o.dataset.open, { tab: 'history' }); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -121,5 +122,15 @@ export function mount(el, ctx) {
   });
 
   render();
-  return { update(evt) { if (evt === 'history' || evt === 'data') render(); } };
+  let lastLive = store.state.history.slice();
+  return {
+    update(evt) {
+      if (evt === 'history') {
+        // Les entrées qui sortent de la fenêtre temps réel restent visibles.
+        if (older.length) older = store.dedupeHistory([older, lastLive]);
+        lastLive = store.state.history.slice();
+      }
+      if (evt === 'history' || evt === 'data') render();
+    },
+  };
 }

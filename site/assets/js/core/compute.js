@@ -3,7 +3,7 @@
 
 import { columnByKey, listOptions, memberById, milestoneByRole, STAGES } from './schema.js';
 import {
-  addDays, diffDays, fmtDate, fmtDateTime, fmtNumber, isEmpty, norm, parseDateInput as parseDateLoose,
+  addDays, diffDays, fmtDate, fmtDateTime, fmtNumber, isEmpty, norm, parseDateInput as parseDateLoose, parseNumberInput,
   startOfWeek, todayISO,
 } from './utils.js';
 
@@ -363,12 +363,7 @@ export function coerceValue(settings, col, raw, { addMissing } = {}) {
 
 function coerceNonEmpty(settings, col, text, addMissing) {
   switch (col.type) {
-    case 'number': {
-      if (typeof text === 'number') return text;
-      const s = String(text).replace(/[\s  ]|k€|€/gi, '').replace(',', '.');
-      const n = Number(s);
-      return Number.isFinite(n) ? n : null;
-    }
+    case 'number': return parseNumberInput(text);
     case 'date': return parseDateLoose(text);
     case 'checkbox': return ['oui', 'yes', 'x', 'vrai', 'true', '1', '✓', 'ok'].includes(norm(text));
     case 'select': return matchOption(settings, col.list, String(text), addMissing);
