@@ -82,7 +82,7 @@ await step('Une modification de A apparaît chez B en temps réel (avec surbrill
   const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Alto Distribution').id);
   const t0 = Date.now();
   await get(A.page, (s, i) => s.updateField(i, 'groupe', 'Groupe modifié par Camille'), id);
-  const own = await until(A.page, (s, i) => s.getContract(i)?.values.groupe === 'Groupe modifié par Camille', id, 'valeur chez A');
+  await until(A.page, (s, i) => s.getContract(i)?.values.groupe === 'Groupe modifié par Camille', id, 'valeur chez A');
   console.log(`    (affichée chez A en ${Date.now() - t0} ms)`);
   const r = await until(B.page, (s, i) => s.getContract(i)?.values.groupe === 'Groupe modifié par Camille', id, 'valeur chez B');
   console.log(`    (propagée en ${r.ms} ms)`);

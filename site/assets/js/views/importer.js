@@ -24,8 +24,9 @@ export async function exportExcel(ctx, ids = null) {
   const contracts = ids ? ids.map((id) => store.getContract(id)).filter(Boolean) : all;
   const close = toast('Préparation du fichier Excel…', { timeout: 0 });
   try {
+    const history = await store.fullHistory();
     const blob = await exportWorkbook({
-      settings: store.state.settings, contracts, derived: store.state.derived, history: store.state.history,
+      settings: store.state.settings, contracts, derived: store.state.derived, history,
       filtersLabel: ids && ids.length !== all.length ? 'sélection filtrée' : '', today: store.state.today,
     });
     downloadBlob(blob, `${baseName(store)}_${fileStamp()}.xlsx`);

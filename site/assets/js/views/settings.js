@@ -220,7 +220,7 @@ export function mount(el, ctx, { sub } = {}) {
       <section class="card form-card">
         ${isStatus ? `<p class="muted small">Pour chaque statut, l’<strong>étape</strong> indique comment il est compté (à lancer, en cours, bloqué, signé, abandonné) et l’<strong>avancement</strong> alimente les jauges. La <strong>date automatique</strong> est renseignée quand un contrat passe à ce statut (et inversement, voir Automatisations).</p>` : ''}
         <div class="edit-table list-table ${isStatus ? 'is-status' : ''}">
-          <div class="et-head"><span></span><span>Couleur</span><span>Valeur</span>${isStatus ? '<span>Étape</span><span>Avancement</span><span>Date automatique</span>' : ''}<span>Utilisation</span><span></span></div>
+          <div class="et-head"><span>Ordre</span><span>Couleur</span><span>Valeur</span>${isStatus ? '<span>Étape</span><span>Avanc. (%)</span><span>Date automatique</span>' : ''}<span>Utilisé par</span><span></span></div>
           ${list.map((o, i) => `<div class="et-row" data-i="${i}">
             <span class="order-btns"><button class="icon-btn" data-up="${i}" aria-label="Monter" ${i === 0 ? 'disabled' : ''}>${icon('chevronUp')}</button><button class="icon-btn" data-down="${i}" aria-label="Descendre" ${i === list.length - 1 ? 'disabled' : ''}>${icon('chevronDown')}</button></span>
             <button class="swatch-btn" data-color="${i}" style="--c:${esc(o.color)}" aria-label="Couleur"></button>
@@ -426,7 +426,7 @@ export function mount(el, ctx, { sub } = {}) {
     if (act === 'import') openImportDialog(ctx);
     if (act === 'export') exportExcel(ctx);
     if (act === 'backup') {
-      const data = store.exportBackup();
+      const data = await store.exportBackup();
       downloadBlob(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), `Sauvegarde_${(store.state.settings.season.refPrefix || 'saison')}_${todayISO()}.json`);
     }
     if (act === 'demo') {

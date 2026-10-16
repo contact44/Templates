@@ -26,6 +26,9 @@ export function mount(el, ctx) {
   const { store } = ctx;
   const f = { user: '', type: '', period: '', q: '' };
   let limit = 200;
+  let older = [];
+  let exhausted = !store.state.backend.historyIsPartial;
+  const allEntries = () => store.dedupeHistory([store.state.history, older]);
   el.innerHTML = `<div class="page page-journal">
     <div class="filterbar"><div class="filterbar-row">
       <label class="search">${icon('search')}<input type="search" placeholder="Rechercher un contrat, un champ, une valeur…" aria-label="Rechercher dans le journal"></label>
@@ -43,7 +46,7 @@ export function mount(el, ctx) {
   function filteredEntries() {
     const now = Date.now();
     const q = norm(f.q);
-    return store.state.history.filter((h) => {
+    return allEntries().filter((h) => {
       if (f.user && h.user !== f.user) return false;
       if (f.type) {
         if (f.type === 'import' && !['import', 'restore-all', 'restore'].includes(h.action)) return false;
@@ -59,7 +62,7 @@ export function mount(el, ctx) {
   }
 
   function render() {
-    const users = [...new Set(store.state.history.map((h) => h.user).filter(Boolean))].sort();
+    const users = [...new Set(allEntries().map((h) => h.user).filter(Boolean))].sort();
     userSel.innerHTML = `<option value="">Tous les utilisateurs</option>${users.map((u) => `<option ${u === f.user ? 'selected' : ''}>${esc(u)}</option>`).join('')}`;
     const entries = filteredEntries();
     if (!entries.length) {
@@ -86,7 +89,8 @@ export function mount(el, ctx) {
       </div>`);
     }
     listEl.innerHTML = rows.join('');
-    moreEl.innerHTML = entries.length > limit ? `<button class="btn btn-ghost" data-act="more">Afficher plus (${entries.length - limit} restantes)</button>` : `<span class="muted small">${entries.length} entrée(s)</span>`;
+    moreEl.innerHTML = entries.length > limit ? `<button class="btn btn-ghost" data-act="more">Afficher plus (${entries.length - limit} restantes)</button>`
+      : !exhausted ? `<button class="btn btn-ghost" data-act="older">Charger les entrées plus anciennes</button>` : `<span class="muted small">${entries.length} entrée(s)</span>`;
   }
 
   el.addEventListener('change', (e) => {
@@ -95,12 +99,21 @@ export function mount(el, ctx) {
   });
   const onSearch = debounce((v) => { f.q = v; limit = 200; render(); }, 180);
   el.querySelector('input[type="search"]').addEventListener('input', (e) => onSearch(e.target.value));
-  el.addEventListener('click', (e) => {
+  el.addEventListener('click', async (e) => {
     const o = e.target.closest('[data-open]');
     if (o) { ctx.openContract(o.dataset.open, { tab: 'history' }); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'more') { limit += 300; render(); }
+    if (act === 'older') {
+      const all = allEntries();
+      const page = await store.olderHistory(all.length ? all[all.length - 1].ts : null, 500);
+      older = store.dedupeHistory([older, page]);
+      if (page.length < 500) exhausted = true;
+      limit += 500;
+      render();
+    }
     if (act === 'csv') {
+      if (!exhausted) { older = store.dedupeHistory([older, await store.fullHistory()]); exhausted = true; }
       const rows = [['Date et heure', 'Utilisateur', 'Réf.', 'Contrat', 'Action', 'Champ', 'Ancienne valeur', 'Nouvelle valeur'],
         ...filteredEntries().map((h) => [fmtDateTime(h.ts), h.user || '', h.contractRef || '', h.contractLabel || '', ACTION_LABEL[h.action] || h.action, h.fieldLabel || '', h.from || '', h.to || ''])];
       downloadBlob(new Blob([toCSV(rows)], { type: 'text/csv;charset=utf-8' }), `Journal_${todayISO()}.csv`);

@@ -3,7 +3,7 @@
 // alertes prioritaires, échéances proches et activité récente.
 
 import { icon } from '../ui/icons.js';
-import { avatar, emptyState, levelIcon, optionChip } from '../ui/components.js';
+import { avatar, emptyState, levelIcon } from '../ui/components.js';
 import {
   barListHTML, bindMarkTips, fitSegmentLabels, renderBurnup, stackedHTML, timelineHTML,
 } from '../ui/charts.js';

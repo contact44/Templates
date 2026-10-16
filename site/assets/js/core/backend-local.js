@@ -167,6 +167,12 @@ export function createLocalBackend({ seasonId = '2027', profile = {} } = {}) {
       persist(); emitHistory();
     },
 
+    async loadHistory({ beforeTs = null, contractId = null, max = 500 } = {}) {
+      if (contractId) return deepClone(data.history.filter((h) => h.contractId === contractId));
+      return deepClone(data.history.filter((h) => !beforeTs || h.ts < beforeTs).slice(0, max));
+    },
+    historyIsPartial: false,
+
     setPresence() {},
 
     /** Remplace tout le contenu (restauration d'une sauvegarde, données de démonstration). */

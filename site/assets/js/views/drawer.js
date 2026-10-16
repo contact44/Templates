@@ -359,7 +359,16 @@ const ACTION_LABEL = { create: 'a créé le contrat', delete: 'a supprimé le co
 
 function renderHistory(body) {
   const { store } = state.ctx;
-  const list = store.state.history.filter((h) => h.contractId === state.id);
+  const id = state.id;
+  if (!state.fullHistory || state.fullHistory.id !== id) {
+    state.fullHistory = { id, entries: null };
+    store.contractHistory(id).then((entries) => {
+      if (state?.id !== id) return;
+      state.fullHistory = { id, entries };
+      if (state.tab === 'history') renderTab();
+    });
+  }
+  const list = store.dedupeHistory([store.state.history.filter((h) => h.contractId === id), state.fullHistory.entries]);
   body.innerHTML = list.length ? `<ol class="timeline">${list.map((h) => `
     <li class="tl-item">
       <span class="tl-dot"></span>

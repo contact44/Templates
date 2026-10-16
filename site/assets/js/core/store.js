@@ -491,9 +491,42 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     await backend.addHistory([historyEntry(c, extra)]).catch(() => {});
   }
 
+  /* ----------------------------------------------- Journal à la demande */
+
+  const dedupe = (lists) => {
+    const seen = new Map();
+    for (const l of lists) for (const h of l || []) if (h && !seen.has(h.id)) seen.set(h.id, h);
+    return [...seen.values()].sort((a, b) => b.ts - a.ts);
+  };
+
+  /** Historique complet d'un contrat (entrées récentes + anciennes). */
+  async function contractHistory(contractId) {
+    const recent = state.history.filter((h) => h.contractId === contractId);
+    try { return dedupe([recent, await backend.loadHistory({ contractId })]); } catch { return recent; }
+  }
+
+  /** Page d'entrées plus anciennes que la plus ancienne connue. */
+  async function olderHistory(beforeTs, max = 500) {
+    try { return await backend.loadHistory({ beforeTs, max }); } catch (err) { emit('error', { message: errorMessage(err, 'le chargement du journal'), err }); return []; }
+  }
+
+  /** Tout le journal (exports). */
+  async function fullHistory() {
+    let all = state.history.slice();
+    if (!backend.historyIsPartial) return all;
+    for (let guard = 0; guard < 40; guard++) {
+      const oldest = all.length ? all[all.length - 1].ts : null;
+      const page = await olderHistory(oldest, 1000);
+      all = dedupe([all, page]);
+      if (page.length < 1000) break;
+    }
+    return all;
+  }
+
   /* ---------------------------------------------- Sauvegarde et démonstration */
 
-  function exportBackup() {
+  async function exportBackup() {
+    const history = await fullHistory();
     return {
       format: 'suivi-saison-contractuelle',
       version: 1,
@@ -502,7 +535,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
       settings: deepClone(state.settings),
       contracts: state.list.map(deepClone),
       comments: deepClone(state.comments),
-      history: deepClone(state.history),
+      history: deepClone(history),
     };
   }
 
@@ -600,7 +633,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     updateField, updateFields, bulkUpdate, createContract, duplicateContract, deleteContracts, importContracts,
     undo, redo, canUndo: () => undoStack.length > 0, canRedo: () => redoStack.length > 0,
     saveSettings, renameListValue, replaceListValueInContracts, countListValueUsage, replaceMemberInContracts,
-    addComment, deleteComment, logEvent,
+    addComment, deleteComment, logEvent, contractHistory, olderHistory, fullHistory, dedupeHistory: dedupe,
     exportBackup, restoreBackup, loadDemo, clearAll,
     setPresence, peers, formatRef,
     member: (id) => memberById(state.settings, id),

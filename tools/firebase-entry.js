@@ -11,5 +11,5 @@ export {
   memoryLocalCache, connectFirestoreEmulator,
   collection, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc, deleteDoc, addDoc,
   writeBatch, serverTimestamp, query, orderBy, limit, where, deleteField, Timestamp,
-  runTransaction, increment, onSnapshotsInSync,
+  runTransaction, increment, onSnapshotsInSync, startAfter,
 } from 'firebase/firestore';

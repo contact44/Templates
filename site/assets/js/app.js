@@ -184,9 +184,9 @@ export function startApp(root, store, { config }) {
   function renderBanner() {
     const el = $('#banner');
     if (config.preview) {
-      el.innerHTML = `<div class="banner banner-info">${icon('info')}<span><strong>Aperçu</strong> avec des données fictives : vos modifications restent dans ce navigateur. En ligne, avec Firebase configuré, les contract managers modifient les mêmes données en temps réel.</span></div>`;
+      el.innerHTML = `<div class="banner banner-info">${icon('info')}<span class="long"><strong>Aperçu</strong> avec des données fictives : vos modifications restent dans ce navigateur. En ligne, avec Firebase configuré, les contract managers modifient les mêmes données en temps réel.</span><span class="short"><strong>Aperçu</strong> · données fictives</span></div>`;
     } else if (backend.kind === 'local' && !sessionStorageGet('hideLocalBanner')) {
-      el.innerHTML = `<div class="banner banner-warn">${icon('database')}<span><strong>Mode local :</strong> les données sont enregistrées dans ce navigateur uniquement et ne sont pas partagées. Pour travailler à plusieurs en temps réel, configurez Firebase (voir le guide de mise en ligne).</span><button class="icon-btn" aria-label="Masquer" id="banner-x">${icon('close')}</button></div>`;
+      el.innerHTML = `<div class="banner banner-warn">${icon('database')}<span class="long"><strong>Mode local :</strong> les données sont enregistrées dans ce navigateur uniquement et ne sont pas partagées. Pour travailler à plusieurs en temps réel, configurez Firebase (voir le guide de mise en ligne).</span><span class="short"><strong>Mode local</strong> · données non partagées</span><button class="icon-btn" aria-label="Masquer" id="banner-x">${icon('close')}</button></div>`;
       el.querySelector('#banner-x').onclick = () => { sessionStorageSet('hideLocalBanner', '1'); el.innerHTML = ''; };
     } else el.innerHTML = '';
   }
@@ -220,6 +220,7 @@ export function startApp(root, store, { config }) {
     const items = [
       { header: me.email ? `${me.name} · ${me.email}` : me.name },
       { label: 'Qui suis-je dans l’équipe ?', icon: 'user', onClick: chooseIdentity },
+      { label: document.documentElement.dataset.theme === 'dark' ? 'Thème clair' : 'Thème sombre', icon: document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', onClick: () => $('#theme-btn').click() },
     ];
     if (backend.kind === 'firebase') {
       items.push({ label: 'Changer mon mot de passe', icon: 'key', onClick: changePassword });

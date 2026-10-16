@@ -12,6 +12,9 @@
 const ONLINE_WINDOW_MS = 75000;
 const HEARTBEAT_MS = 30000;
 const MAX_BATCH = 450;
+// Seules les entrées récentes du journal sont suivies en temps réel (quota gratuit Firebase) ;
+// les plus anciennes sont chargées à la demande.
+const RECENT_HISTORY = 300;
 
 function sanitize(value) {
   if (value === undefined) return null;
@@ -196,7 +199,7 @@ export async function createFirebaseBackend(config) {
         handlers.comments(list);
       }, report));
 
-      unsubs.push(fb.onSnapshot(fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.limit(1500)), (snap) => {
+      unsubs.push(fb.onSnapshot(fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.limit(RECENT_HISTORY)), (snap) => {
         const list = [];
         snap.forEach((d) => { const x = d.data(); list.push({ ...x, id: d.id, serverTs: undefined }); });
         handlers.history(list);
@@ -303,6 +306,17 @@ export async function createFirebaseBackend(config) {
     async addComment(comment) { fire(fb.setDoc(fb.doc(commentsCol, comment.id), sanitize(comment))); },
     async deleteComment(id) { fire(fb.deleteDoc(fb.doc(commentsCol, id))); },
     async addHistory(entries) { const b = batches(); addHistoryTo(b, entries); b.commit(); },
+
+    /** Entrées du journal : celles d'un contrat, ou une page d'entrées plus anciennes que beforeTs. */
+    async loadHistory({ beforeTs = null, contractId = null, max = 500 } = {}) {
+      let q;
+      if (contractId) q = fb.query(historyCol, fb.where('contractId', '==', contractId));
+      else if (beforeTs) q = fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.startAfter(beforeTs), fb.limit(max));
+      else q = fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.limit(max));
+      const snap = await fb.getDocs(q);
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id, serverTs: undefined })).sort((a, b) => b.ts - a.ts);
+    },
+    historyIsPartial: true,
 
     setPresence(info) {
       presenceInfo = { ...info };

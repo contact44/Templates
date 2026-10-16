@@ -13,7 +13,7 @@ import {
 } from '../core/compute.js';
 import { columnByKey, listOptions, SWATCHES } from '../core/schema.js';
 import {
-  debounce, esc, fmtMoneyK, fmtNumber, isEmpty, norm, parseDateInput, parseTSV, pluralize, toTSV, todayISO,
+  debounce, esc, fmtMoneyK, fmtNumber, isEmpty, norm, parseTSV, pluralize, toTSV,
 } from '../core/utils.js';
 import { exportMenu, openImportDialog } from './importer.js';
 

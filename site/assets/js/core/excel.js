@@ -249,7 +249,6 @@ export function buildImport(settings, headers, dataRows, mapping) {
 
 /* ----------------------------------------------------------------- Écriture */
 
-const argb = (hex) => `FF${String(hex || '#000000').replace('#', '').toUpperCase().padStart(6, '0')}`;
 function tint(hex, amount = 0.82) {
   const h = String(hex || '#a3a7af').replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16);
