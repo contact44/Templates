@@ -1,5 +1,5 @@
 // Stockage « mode local » : les données restent dans ce navigateur (localStorage).
-// Utilisé pour la démonstration et tant que Firebase n'est pas configuré.
+// Utilisé pour l'aperçu, la démonstration et tant qu'aucun dépôt GitHub n'est configuré.
 // Les onglets d'un même navigateur restent synchronisés (BroadcastChannel).
 
 import { deepClone, safeStorage, uid } from './utils.js';
@@ -7,7 +7,7 @@ import { deepClone, safeStorage, uid } from './utils.js';
 const HISTORY_CAP = 4000;
 
 export function createLocalBackend({ seasonId = '2027', profile = {} } = {}) {
-  const key = `saison:${seasonId}:data`;
+  const key = `saison:${seasonId}:v2`;
   const tabId = uid(8);
   let data = null;
   let handlers = null;

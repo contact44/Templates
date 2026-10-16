@@ -1,246 +1,191 @@
-// Tableau de bord : compte à rebours, jauges CGV et signatures, frise de la saison,
-// indicateurs, pipeline par statut, avancement par dimension, rythme de signature,
-// alertes prioritaires, échéances proches et activité récente.
+// Tableau de bord : la situation de la saison en un coup d'œil — compte à rebours, dossiers par phase,
+// répartition par étape (REPORT PAR DIV), avancement par division, par CM et par juriste, dossiers qui
+// n'avancent plus, activité récente de l'équipe et notes partagées.
 
 import { icon } from '../ui/icons.js';
-import { avatar, emptyState, levelIcon } from '../ui/components.js';
-import {
-  barListHTML, bindMarkTips, fitSegmentLabels, renderBurnup, stackedHTML, timelineHTML,
-} from '../ui/charts.js';
-import { filterBar, filtersActive } from './filterbar.js';
-import {
-  agenda, breakdown, byStatus, kpis, LEVEL_RANK, signatureSeries,
-} from '../core/compute.js';
-import { columnByKey, STAGES, STAGE_ORDER_FOR_BARS } from '../core/schema.js';
-import { buildDemo } from '../core/demo.js';
-import { confirmDialog } from '../ui/overlay.js';
+import { avatar, safeUrl, stageColor } from '../ui/components.js';
+import { toast } from '../ui/overlay.js';
+import { phaseBarHTML, phases } from '../ui/steps.js';
+import { accountHref } from './accounts.js';
 import { openImportDialog } from './importer.js';
-import {
-  addDays, debounce, esc, fmtCountdown, fmtDate, fmtMoneyK, fmtNumber, fmtPct, fmtRelative, pluralize,
-} from '../core/utils.js';
-
-const DIMS = [
-  { key: 'cm', label: 'Contract manager' },
-  { key: 'division', label: 'Division' },
-  { key: 'canal', label: 'Canal' },
-  { key: 'priorite', label: 'Priorité' },
-  { key: 'typeContrat', label: 'Type' },
-];
+import { accountKey, divisionGroup, groupAccounts, kpis, stepIndex, workload } from '../core/compute.js';
+import { listOptions, REPORT_STAGES, stageLabel, stepName } from '../core/schema.js';
+import { buildDemo } from '../core/demo.js';
+import { esc, fmtCountdown, fmtDate, fmtDateTime, fmtNumber, fmtRelative } from '../core/utils.js';
 
 export function mount(el, ctx) {
   const { store } = ctx;
-  const fb = filterBar(ctx, { quick: false });
-  el.innerHTML = '<div class="page page-dashboard"></div>';
+  el.innerHTML = '<div class="page page-dash"></div>';
   const page = el.firstElementChild;
-  page.appendChild(fb.el);
-  const body = document.createElement('div');
-  body.className = 'dash';
-  page.appendChild(body);
-  bindMarkTips(body);
+  let editing = null;
 
-  const isDark = () => document.documentElement.dataset.theme === 'dark';
-  const segColors = () => STAGE_ORDER_FOR_BARS.map((id) => {
-    const s = STAGES.find((x) => x.id === id);
-    return { key: id, label: s.label, color: isDark() ? s.darkColor : s.color };
-  });
+  const goAccounts = (patch) => {
+    store.setPrefs({ accounts: { search: '', cm: '', juriste: '', division: '', phase: '', statut: 'ouverts', sort: store.state.prefs.accounts?.sort || 'nom', ...patch } });
+    ctx.navigate('comptes');
+  };
+
+  function noteCard(key, title, iconName, empty) {
+    const text = store.state.settings[key] || '';
+    if (editing === key) {
+      return `<article class="card note-card editing" data-note="${key}">
+        <header class="card-head"><h2>${icon(iconName)}${esc(title)}</h2></header>
+        <textarea class="input textarea" rows="8" aria-label="${esc(title)}">${esc(text)}</textarea>
+        <div class="pop-actions"><span class="muted small">Visible par toute l’équipe.</span><button class="btn btn-ghost btn-sm" data-act="cancel-note">Annuler</button><button class="btn btn-primary btn-sm" data-act="save-note">${icon('check')}<span>Enregistrer</span></button></div>
+      </article>`;
+    }
+    return `<article class="card note-card" data-note="${key}">
+      <header class="card-head"><h2>${icon(iconName)}${esc(title)}</h2><button class="btn btn-ghost btn-sm" data-act="edit-note">${icon('edit')}<span>Modifier</span></button></header>
+      ${text ? `<div class="note-text">${esc(text).replace(/\n/g, '<br>')}</div>` : `<p class="muted">${esc(empty)}</p>`}
+    </article>`;
+  }
+
+  function ring(pct) {
+    const r = 52; const c = 2 * Math.PI * r;
+    return `<div class="ring ring-xl" role="img" aria-label="${pct} % des dossiers signés"><svg viewBox="0 0 124 124" width="124" height="124"><circle cx="62" cy="62" r="${r}" class="ring-bg"/><circle cx="62" cy="62" r="${r}" class="ring-fg" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct / 100)}"/></svg><span class="ring-num">${pct}<small>%</small></span></div>`;
+  }
+
+  /** Histogramme des 15 étapes REPORT PAR DIV, colorées par phase. */
+  function stepsChart(list) {
+    const s = store.state.settings;
+    const steps = listOptions(s, 'reportDiv');
+    const counts = steps.map(() => 0);
+    for (const c of list) { const i = stepIndex(s, c); if (i >= 0) counts[i]++; }
+    const max = Math.max(1, ...counts);
+    const groups = phases(s);
+    return `<div class="steps-chart" role="list">
+      ${groups.map((g) => `<div class="sc-phase" style="flex:${g.steps.length};--c:${esc(stageColor(g.stage))}">
+        <div class="sc-bars">${g.steps.map(({ option, index }) => `<button type="button" class="sc-bar" role="listitem" data-phase="${g.stage}" data-tip="${esc(`${option.value} : ${counts[index]} dossier(s)`)}"><span class="sc-n">${counts[index] || ''}</span><span class="sc-fill" style="height:${counts[index] ? Math.max(4, (counts[index] / max) * 100) : 0}%"></span><span class="sc-x">${index + 1}</span></button>`).join('')}</div>
+        <div class="sc-label">${esc(stageLabel(s, g.stage))}</div>
+      </div>`).join('')}
+    </div>`;
+  }
 
   function render() {
     const s = store.state.settings;
-    const today = store.state.today;
-    const all = store.state.list;
-    if (!all.length) {
-      body.innerHTML = emptyState({
-        iconName: 'sheet',
-        title: 'Aucun contrat pour l’instant',
-        text: 'Importez votre fichier de suivi Excel, créez votre premier contrat ou chargez des données de démonstration pour découvrir l’outil.',
-        actions: `<button class="btn btn-primary" data-act="import">${icon('upload')}<span>Importer un fichier Excel</span></button><button class="btn btn-secondary" data-act="new">${icon('plus')}<span>Nouveau contrat</span></button><button class="btn btn-ghost" data-act="demo">${icon('sparkle')}<span>Données de démonstration</span></button>`,
-      });
-      return;
-    }
-    const list = store.filtered();
+    const list = store.state.list;
     const derived = store.state.derived;
-    const k = kpis(s, list, derived, today);
-    const scoped = filtersActive(store);
+    const k = kpis(s, list, derived, store.state.today);
+    const year = s.season.year;
     const sig = k.signatureMilestone;
-    const cgv = k.cgvMilestone;
-    const dimKey = DIMS.some((d) => d.key === store.state.prefs.dashboardDim && columnByKey(s, d.key)) ? store.state.prefs.dashboardDim : 'cm';
-    const dimLabel = DIMS.find((d) => d.key === dimKey)?.label;
+    const pct = Math.round(k.signedPct * 100);
+    const accounts = groupAccounts(s, list, derived);
+    const openAccounts = accounts.filter((a) => a.role !== 'ferme');
+    const tracked = list.filter((c) => REPORT_STAGES.includes(derived.get(c.id)?.stage));
 
-    // Héros : compte à rebours vers la date butoir.
-    let heroNum = '—'; let heroText = 'Aucune date butoir définie (Paramètres › Saison).';
-    if (sig) {
-      const d = k.daysToSignature;
-      heroNum = d >= 0 ? `J-${d}` : `J+${-d}`;
-      heroText = d > 0 ? `avant la date butoir de signature du ${fmtDate(sig.date, 'long')}` : d === 0 ? `Date butoir aujourd’hui (${fmtDate(sig.date, 'long')})` : `après la date butoir du ${fmtDate(sig.date, 'long')}`;
+    // Par division (regroupements du reporting : MO (LCD/LED/LFD) → MO).
+    const byDiv = new Map();
+    for (const c of tracked) {
+      const g = divisionGroup(s, c.values.division) || '—';
+      if (!byDiv.has(g)) byDiv.set(g, { todo: 0, active: 0, signature: 0, done: 0, n: 0 });
+      const x = byDiv.get(g); x[derived.get(c.id).stage]++; x.n++;
     }
-    const nextMs = (s.milestones || []).filter((m) => m.date && m.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+    const divOrder = [...new Set(listOptions(s, 'division').map((o) => o.group || o.value))];
+    const divRows = [...byDiv.entries()].sort((a, b) => (divOrder.indexOf(a[0]) + 1 || 99) - (divOrder.indexOf(b[0]) + 1 || 99));
+    const divMax = Math.max(1, ...divRows.map(([, x]) => x.n));
 
-    const meter = (label, num, den, pct, tone, extra = '') => `
-      <div class="hero-meter">
-        <div class="hero-meter-top"><span>${esc(label)}</span><strong>${fmtPct(pct)}</strong></div>
-        <div class="meter meter-lg tone-${tone}" role="img" aria-label="${esc(label)} : ${num} sur ${den}"><span class="meter-fill" style="width:${Math.round(pct * 100)}%"></span></div>
-        <div class="hero-meter-foot"><strong>${fmtNumber(num)}</strong> sur ${fmtNumber(den)}${extra}</div>
-      </div>`;
+    const team = workload(s, list, derived, 'cm').rows.filter((r) => r.actifs);
+    const jur = workload(s, list, derived, 'juriste').rows.filter((r) => r.actifs);
 
-    const statusRows = byStatus(s, list).map((r) => ({
-      key: r.value, label: r.value, value: r.count, color: r.color,
-      sub: r.ca ? fmtMoneyK(r.ca) : '', subLabel: 'CA N-1 cumulé',
-    }));
-    const groups = breakdown(s, list, derived, dimKey);
-    const series = signatureSeries(s, list, derived, today);
-    const ag = agenda(s, list, derived, today);
-    const soon = [...ag.overdue, ...ag.week, ...ag.next, ...ag.later].filter((x) => x.date <= addDays(today, 14)).slice(0, 8);
-    const alerts = list
-      .map((c) => ({ c, d: derived.get(c.id) }))
-      .filter(({ d }) => d.alerts.some((a) => a.level === 'critical' || a.level === 'serious'))
-      .sort((a, b) => LEVEL_RANK[b.d.level] - LEVEL_RANK[a.d.level] || (Number(b.c.values.ca) || 0) - (Number(a.c.values.ca) || 0))
-      .slice(0, 8);
-    const activity = store.state.history.slice(0, 9);
+    // Dossiers qui n'avancent plus (même étape depuis longtemps).
+    const stuck = list.filter((c) => derived.get(c.id)?.stadeLevel).sort((a, b) => derived.get(b.id).joursStade - derived.get(a.id).joursStade);
+    const recent = store.state.history.filter((h) => h.contractId || h.action === 'import').slice(0, 9);
 
-    body.innerHTML = `
-      ${scoped ? `<div class="scope-note">${icon('filter')}<span>Indicateurs calculés sur <strong>${pluralize(list.length, 'contrat filtré', 'contrats filtrés')}</strong> (sur ${all.length}).</span></div>` : ''}
-      <section class="hero card">
-        <div class="hero-count">
-          <div class="hero-num">${esc(heroNum)}</div>
-          <div class="hero-text">${esc(heroText)}</div>
-          ${nextMs && nextMs.date !== sig?.date ? `<div class="hero-next">${icon('flag')}<span>Prochain jalon : <strong>${esc(nextMs.label)}</strong> le ${esc(fmtDate(nextMs.date, 'long'))} (${esc(fmtCountdown(Math.round((Date.parse(nextMs.date) - Date.parse(today)) / 86400000)))})</span></div>` : ''}
+    const start = list.length ? '' : `
+      <section class="card start-card">
+        <div class="start-text"><h2>${icon('sparkle')}Bienvenue dans le suivi de la saison ${esc(String(year))}</h2>
+          <p class="muted">La base est vide. Importez votre classeur « Suivi CM » (.xlsx ou .xlsm) : les colonnes sont reconnues automatiquement, les CM et juristes sont créés. Les données sont ensuite partagées avec toute l’équipe.</p></div>
+        <div class="btn-row"><button class="btn btn-primary" data-act="start-import">${icon('upload')}<span>Importer le fichier Suivi CM</span></button><button class="btn btn-ghost" data-act="start-demo">${icon('sparkle')}<span>Essayer avec des données fictives</span></button></div>
+      </section>`;
+    const links = (s.home?.links || []).filter((l) => l.label && l.url);
+
+    page.innerHTML = `${start}
+      <section class="dash-hero card">
+        <div class="dh-main">
+          <p class="hero-kicker">${esc(s.season.entity || 'Direction juridique')}</p>
+          <h2 class="dh-title">Saison contractuelle ${esc(String(year))}</h2>
+          <p class="dh-sub">${fmtNumber(openAccounts.length)} comptes clients suivis · ${fmtNumber(k.attendus)} dossiers (PAF / contrats) attendus · mis à jour en temps réel</p>
+          <div class="dh-bar">${phaseBarHTML(s, k.byStage, { height: 14, labels: true })}</div>
+          <div class="dh-legend">${REPORT_STAGES.map((st) => `<span><span class="ps-dot" style="--c:${esc(stageColor(st))}"></span>${esc(stageLabel(s, st))} <strong>${fmtNumber(k.byStage[st])}</strong></span>`).join('')}</div>
         </div>
-        <div class="hero-meters">
-          ${cgv ? meter('CGV envoyées', k.cgvSent, k.live, k.cgvPct, 'brand', ` · échéance ${fmtDate(cgv.date, 'dm')}`) : ''}
-          ${meter('Conventions signées', k.signed, k.live, k.signedPct, 'good')}
-          ${k.caTotal ? meter('CA N-1 signé', Math.round(k.caSigned), Math.round(k.caTotal), k.caSignedPct, 'good', ' k€') : ''}
+        <div class="dh-ring">${ring(pct)}<span class="dh-ring-label"><strong>${fmtNumber(k.signes)}</strong> signés sur ${fmtNumber(k.attendus)}</span></div>
+        <div class="dh-count" ${sig ? `data-tip="${esc(sig.label)}"` : ''}>
+          <span class="hero-count-num">${sig ? esc(fmtCountdown(k.daysToSignature)) : '—'}</span>
+          <span class="hero-count-label">${sig ? `avant la date butoir<br>du ${esc(fmtDate(sig.date, 'long'))}` : 'Date butoir non définie'}</span>
         </div>
       </section>
 
-      <section class="card timeline-card">${timelineHTML(s.milestones || [], today, { width: body.clientWidth - 80 })}</section>
-
-      <section class="kpis">
-        ${tile('Contrats suivis', k.live, k.cancelled ? `${k.cancelled} abandonné(s) exclu(s)` : `${fmtMoneyK(k.caTotal) || '0 k€'} de CA N-1`, 'table', '')}
-        ${tile('En cours', k.active, `${k.todo} à lancer`, 'refresh', 'active')}
-        ${tile('Signés', k.signed, fmtPct(k.signedPct), 'checkCircle', 'signed', 'good')}
-        ${tile('Bloqués', k.blocked, k.blocked ? 'escalade nécessaire' : 'aucun blocage', 'pause', 'blocked', k.blocked ? 'critical' : '')}
-        ${tile('Alertes critiques', k.critical, `${k.serious} importante(s)`, 'alertCircle', 'alerts', k.critical ? 'critical' : '')}
-        ${tile('Actions en retard', k.overdueActions, `${k.dueSoon} à échéance proche`, 'clock', 'late', k.overdueActions ? 'serious' : '')}
+      <section class="phase-strip">
+        ${REPORT_STAGES.map((st) => `<button class="ps-card" data-phase="${st}" style="--c:${esc(stageColor(st))}"><span class="ps-label"><span class="ps-dot"></span>${esc(stageLabel(s, st))}</span><span class="ps-num">${fmtNumber(k.byStage[st])}</span><span class="ps-sub">${k.attendus ? Math.round((k.byStage[st] / k.attendus) * 100) : 0} % des dossiers · voir les comptes ${icon('chevronRight')}</span></button>`).join('')}
       </section>
 
-      <div class="dash-grid two">
-        <section class="card">
-          <header class="card-head"><div><h2>Pipeline par statut</h2><p class="card-sub">Nombre de contrats et CA N-1 par étape</p></div><a class="link-btn" href="#/pipeline">Voir le pipeline${icon('chevronRight')}</a></header>
-          <div class="status-bars">${barListHTML(statusRows, { tipLabel: 'contrats' })}</div>
+      <section class="card dash-card">
+        <header class="card-head"><div><h2>Où en sont les dossiers ?</h2><p class="card-sub">Nombre de dossiers à chaque étape (REPORT PAR DIV), du premier contact à la clôture dans SELMS</p></div></header>
+        ${stepsChart(tracked)}
+      </section>
+
+      <div class="dash-grid">
+        <section class="card dash-card">
+          <header class="card-head"><div><h2>Par division</h2><p class="card-sub">Dossiers par phase · cliquez pour voir les comptes</p></div><a class="link-btn" href="#/reporting">Reporting général${icon('chevronRight')}</a></header>
+          <div class="div-bars">${divRows.map(([g, x]) => `<button type="button" class="db-row" data-div="${esc(g)}"><span class="db-name">${esc(g)}</span><span class="db-bar" style="width:${(x.n / divMax) * 100}%">${phaseBarHTML(s, x, { height: 18, labels: true })}</span><span class="db-val"><strong>${x.done}</strong>/${x.n}</span></button>`).join('') || '<p class="muted pad">Aucun dossier.</p>'}</div>
         </section>
-        <section class="card">
-          <header class="card-head"><div><h2>Avancement par ${esc(dimLabel.toLowerCase())}</h2><p class="card-sub">Contrats signés, en cours, à lancer et bloqués</p></div></header>
-          <div class="card-tools"><div class="seg-ctrl" role="tablist" aria-label="Dimension">${DIMS.filter((d) => columnByKey(s, d.key)).map((d) => `<button role="tab" class="${d.key === dimKey ? 'active' : ''}" aria-selected="${d.key === dimKey}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}</div></div>
-          <div class="stack-wrap">${stackedHTML(groups.map((g) => ({ ...g, label: g.label })), segColors())}</div>
+        <section class="card dash-card">
+          <header class="card-head"><div><h2>Équipe</h2><p class="card-sub">Dossiers actifs par contract manager et par juriste</p></div></header>
+          <div class="team-cards">${team.map((r) => { const m = store.member(r.key); return `<button type="button" class="team-card" data-cm="${esc(r.key)}">${avatar(m || { name: r.label, color: '#8d9099' }, { size: 'md', title: false })}<span class="tc-main"><strong>${esc(r.label)}</strong><span class="muted small">${fmtNumber(r.actifs)} dossiers · ${r.pct === null ? '—' : `${Math.round(r.pct * 100)} % signés`}</span>${phaseBarHTML(s, { todo: r.attente, active: r.traitement, signature: r.signature, done: r.signes }, { height: 8 })}</span>${r.bloques ? `<span class="mini-badge warn" data-tip="Dossiers sans changement d’étape depuis ${s.alerts.blocageDays} j ou plus">${icon('clock')}${r.bloques}</span>` : ''}</button>`; }).join('')}</div>
+          <div class="jur-list">${jur.map((r) => `<button type="button" class="jur-row" data-jur="${esc(r.key)}"><span class="jur-name">${esc(r.label)}</span>${phaseBarHTML(s, { todo: r.attente, active: r.traitement, signature: r.signature, done: r.signes }, { height: 8 })}<span class="muted small">${fmtNumber(r.actifs)}</span></button>`).join('')}</div>
         </section>
       </div>
 
-      <section class="card">
-        <header class="card-head"><div><h2>Rythme de signature</h2><p class="card-sub">Signatures cumulées comparées à une trajectoire régulière jusqu’à la date butoir${series.undated ? ` · ${series.undated} contrat(s) signé(s) sans date de signature` : ''}</p></div></header>
-        <div class="burnup-wrap" id="burnup"></div>
+      <div class="dash-grid">
+        <section class="card dash-card">
+          <header class="card-head"><div><h2>${icon('clock')}Dossiers à surveiller</h2><p class="card-sub">Même étape depuis ${s.alerts.vigilanceDays} jours ou plus (bloqué au-delà de ${s.alerts.blocageDays} j)</p></div><span class="count-pill">${stuck.length}</span></header>
+          <ul class="watch-list">${stuck.slice(0, 8).map((c) => { const d = derived.get(c.id); const i = stepIndex(s, c); return `<li><a href="${accountHref(accountKey(c.values.client))}" class="watch-item"><span class="wi-days lvl-${d.stadeLevel}">${d.joursStade} j</span><span class="wi-main"><strong>${esc(c.values.client)}</strong><span class="muted small">${esc(c.values.division || '')} · ${esc(i >= 0 ? stepName(listOptions(s, 'reportDiv')[i].value) : '—')}</span></span>${icon('chevronRight')}</a></li>`; }).join('') || '<li class="muted small pad">Aucun dossier en attente prolongée.</li>'}</ul>
+          ${stuck.length > 8 ? `<button class="link-btn" data-act="all-stuck">Voir les ${stuck.length} dossiers${icon('chevronRight')}</button>` : ''}
+        </section>
+        <section class="card dash-card">
+          <header class="card-head"><div><h2>${icon('history')}Activité récente</h2><p class="card-sub">Les dernières modifications de l’équipe</p></div><a class="link-btn" href="#/journal">Journal${icon('chevronRight')}</a></header>
+          <ul class="act-list">${recent.map((h) => { const c = store.getContract(h.contractId); const client = c?.values.client || (h.contractLabel || '').replace(/\s*\([^)]*\)$/, ''); const what = h.action === 'comment' ? `a commenté « ${h.to} »` : h.action === 'update' ? `${h.fieldLabel || h.field} → ${h.to || '—'}` : h.action === 'create' ? 'a créé une division' : (h.to || h.action); return `<li class="act-item"><div class="act-top">${client ? `<a class="act-client" href="${accountHref(accountKey(client))}">${esc(client)}</a>` : ''}${c?.values.division ? `<span class="mini-badge">${esc(c.values.division)}</span>` : ''}<span class="act-when muted" data-tip="${esc(fmtDateTime(h.ts))}">${esc(h.user || '')} · ${esc(fmtRelative(h.ts))}</span></div><div class="act-what">${esc(what)}</div></li>`; }).join('') || '<li class="muted small">Aucune activité pour l’instant.</li>'}</ul>
+        </section>
+      </div>
+
+      <section class="dash-grid">
+        ${noteCard('homeNotes', 'Dernières modifications', 'history', 'Notez ici les évolutions de la saison (nouveaux statuts, changements d’attribution…).')}
+        ${noteCard('homeVigilance', 'Points de vigilance', 'alert', 'Notez ici les points d’attention par client (ex. « CARREFOUR PC & TA : mêmes conditions dans les 2 PAF »).')}
       </section>
-
-      <div class="dash-grid three">
-        <section class="card list-card">
-          <header class="card-head"><div><h2>Alertes prioritaires</h2><p class="card-sub">Critiques et importantes</p></div><a class="link-btn" href="#/suivi" data-quick="alerts">Tout voir${icon('chevronRight')}</a></header>
-          ${alerts.length ? `<ul class="rows">${alerts.map(({ c, d }) => `
-            <li><button class="row-btn" data-open="${esc(c.id)}">${levelIcon(d.level)}
-              <span class="row-main"><span class="row-title">${esc(c.values.client || '')}</span><span class="row-sub">${esc(d.alerts[0].label)}</span></span>
-              ${avatar(store.member(c.values.cm))}
-            </button></li>`).join('')}</ul>` : `<div class="mini-empty">${icon('checkCircle')}<span>Aucune alerte critique ou importante.</span></div>`}
-        </section>
-        <section class="card list-card">
-          <header class="card-head"><div><h2>Échéances à 14 jours</h2><p class="card-sub">${ag.overdue.length ? `${ag.overdue.length} action(s) en retard` : 'Prochaines actions planifiées'}</p></div><a class="link-btn" href="#/echeancier">Échéancier${icon('chevronRight')}</a></header>
-          ${soon.length ? `<ul class="rows">${soon.map((it) => `
-            <li><button class="row-btn" data-open="${esc(it.contract.id)}">
-              <span class="due ${it.days < 0 ? 'late' : it.days <= 2 ? 'soon' : ''}"><strong>${esc(fmtDate(it.date, 'dm'))}</strong><span>${esc(fmtCountdown(it.days))}</span></span>
-              <span class="row-main"><span class="row-title">${esc(it.contract.values.client || '')}</span><span class="row-sub">${esc(it.contract.values.prochaineAction || 'Action à préciser')}</span></span>
-              ${avatar(store.member(it.contract.values.cm))}
-            </button></li>`).join('')}</ul>` : `<div class="mini-empty">${icon('calendar')}<span>Aucune échéance dans les 14 prochains jours.</span></div>`}
-        </section>
-        <section class="card list-card">
-          <header class="card-head"><div><h2>Activité récente</h2><p class="card-sub">Dernières modifications de l’équipe</p></div><a class="link-btn" href="#/journal">Journal${icon('chevronRight')}</a></header>
-          ${activity.length ? `<ul class="rows feed">${activity.map((h) => `
-            <li><button class="row-btn" ${h.contractId && store.getContract(h.contractId) ? `data-open="${esc(h.contractId)}"` : 'disabled'}>
-              ${avatar({ name: h.user, color: (s.team || []).find((t) => t.name === h.user)?.color || '#8d9099' })}
-              <span class="row-main"><span class="row-title">${esc(activityText(h))}</span><span class="row-sub">${esc(h.contractLabel || '')}${h.contractLabel ? ' · ' : ''}${esc(fmtRelative(h.ts))}</span></span>
-            </button></li>`).join('')}</ul>` : `<div class="mini-empty">${icon('history')}<span>Aucune activité pour l’instant.</span></div>`}
-        </section>
-      </div>`;
-
-    const burn = body.querySelector('#burnup');
-    const draw = () => renderBurnup(burn, series, {
-      today,
-      marks: (s.milestones || []).filter((m) => m.role).map((m) => ({ date: m.date, label: shortMs(m) })),
-      colors: { actual: isDark() ? '#3fbf3f' : '#0a8a0a', target: isDark() ? '#8d9099' : '#9a9da5' },
-    });
-    draw();
-    fitSegmentLabels(body);
-    lastDraw = draw;
+      ${links.length ? `<section class="card links-card"><header class="card-head"><h2>${icon('link')}Liens utiles</h2></header><div class="links-row">${links.map((l) => `<a class="btn btn-secondary" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${icon('external')}<span>${esc(l.label)}</span></a>`).join('')}</div></section>` : ''}`;
+    const ta = page.querySelector('.note-card.editing textarea');
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   }
 
-  function shortMs(m) {
-    if (m.role === 'cgv') return 'CGV';
-    if (m.role === 'signature') return 'Date butoir';
-    if (m.role === 'target') return 'Objectif interne';
-    return m.label;
-  }
-
-  function tile(label, value, sub, ic, quick, tone = '') {
-    return `<a class="kpi card ${tone ? `tone-${tone}` : ''}" href="#/suivi" data-quick="${esc(quick)}">
-      <span class="kpi-ico">${icon(ic)}</span>
-      <span class="kpi-label">${esc(label)}</span>
-      <span class="kpi-value">${fmtNumber(value)}</span>
-      <span class="kpi-sub">${esc(sub)}</span>
-    </a>`;
-  }
-
-  let lastDraw = null;
-  body.addEventListener('click', async (e) => {
-    const open = e.target.closest('[data-open]');
-    if (open) { ctx.openContract(open.dataset.open); return; }
-    const q = e.target.closest('[data-quick]');
-    if (q) { store.setFilters({ quick: q.dataset.quick || '' }); return; }
-    const dim = e.target.closest('[data-dim]');
-    if (dim) { store.setPrefs({ dashboardDim: dim.dataset.dim }); return; }
+  page.addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-phase],[data-div],[data-cm],[data-jur]');
+    if (t) {
+      if (t.dataset.phase) goAccounts({ phase: t.dataset.phase });
+      else if (t.dataset.div) goAccounts({ division: t.dataset.div });
+      else if (t.dataset.cm) goAccounts({ cm: t.dataset.cm });
+      else if (t.dataset.jur) goAccounts({ juriste: t.dataset.jur });
+      return;
+    }
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'new') ctx.newContract();
-    if (act === 'import') openImportDialog(ctx);
-    if (act === 'demo') {
-      if (store.state.backend.kind !== 'local' && !(await confirmDialog({ title: 'Charger des données fictives ?', message: 'Une quarantaine de contrats fictifs seront ajoutés à la base partagée, visibles par toute l’équipe. Vous pourrez les supprimer ensuite (Paramètres › Import, export et sauvegarde › Tout supprimer).', confirmLabel: 'Charger' }))) return;
-      await store.loadDemo(buildDemo);
+    const card = e.target.closest('[data-note]');
+    if (act === 'all-stuck') goAccounts({ sort: 'stade' });
+    if (act === 'start-import') openImportDialog(ctx);
+    if (act === 'start-demo') { await store.loadDemo(buildDemo); toast('Données fictives chargées.', { type: 'success' }); }
+    if (act === 'edit-note') { editing = card.dataset.note; render(); }
+    if (act === 'cancel-note') { editing = null; render(); }
+    if (act === 'save-note') {
+      const key = card.dataset.note;
+      const text = card.querySelector('textarea').value.trim();
+      editing = null;
+      await store.saveSettings({ [key]: text }, key === 'homeNotes' ? 'Dernières modifications mises à jour' : 'Points de vigilance mis à jour');
+      toast('Enregistré pour toute l’équipe.', { type: 'success', timeout: 2500 });
+      render();
     }
   });
+  page.addEventListener('keydown', (e) => {
+    if (e.target.matches('.note-card textarea') && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) page.querySelector('[data-act="save-note"]')?.click();
+  });
 
-  const ro = new ResizeObserver(debounce(() => { lastDraw?.(); fitSegmentLabels(body); }, 120));
-  ro.observe(body);
   render();
-
-  return {
-    update(evt) {
-      if (evt === 'data' || evt === 'history' || evt === 'settings') schedule();
-      if (evt === 'prefs') { fb.update(); schedule(); }
-    },
-    unmount() { ro.disconnect(); },
-  };
-
-  function schedule() {
-    if (schedule.t) return;
-    schedule.t = requestAnimationFrame(() => { schedule.t = null; render(); });
-  }
-}
-
-export function activityText(h) {
-  switch (h.action) {
-    case 'update': return `${h.user} · ${h.fieldLabel || h.field} → ${h.to || '∅'}`;
-    case 'create': return `${h.user} a créé le contrat`;
-    case 'delete': return `${h.user} a supprimé le contrat`;
-    case 'restore': return `${h.user} a restauré le contrat`;
-    case 'comment': return `${h.user} a commenté : ${h.to || ''}`;
-    case 'mail': return `${h.user} a préparé une relance`;
-    case 'import': return `${h.user} · ${h.to || 'import'}`;
-    case 'settings': return `${h.user} a modifié les paramètres (${h.fieldLabel || ''})`;
-    case 'restore-all': return `${h.user} · ${h.to || 'restauration'}`;
-    default: return `${h.user} · ${h.action}`;
-  }
+  const schedule = (() => { let t = null; return () => { if (t) return; t = requestAnimationFrame(() => { t = null; if (!editing) render(); }); }; })();
+  return { update(evt) { if (['data', 'settings', 'history'].includes(evt)) schedule(); } };
 }

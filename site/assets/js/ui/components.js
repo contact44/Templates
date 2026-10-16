@@ -3,7 +3,7 @@
 
 import { icon } from './icons.js';
 import { popover, toast } from './overlay.js';
-import { LEVEL_LABEL } from '../core/compute.js';
+import { LEVEL_LABEL, fmtPercent, fmtSignedDays } from '../core/compute.js';
 import { listOptions, memberById, STAGES } from '../core/schema.js';
 import {
   addDays, esc, fmtDate, inkOn, fmtDateTime, fmtNumber, fmtRelative, initials, isEmpty, norm, parseDateInput, parseNumberInput,
@@ -45,9 +45,7 @@ export function personHTML(settings, id, { compact = false } = {}) {
   return `<span class="person">${avatar(m)}${compact ? '' : `<span class="person-name">${esc(m.name)}</span>`}</span>`;
 }
 
-export function progressHTML(progress, stage) {
-  if (stage === 'blocked') return `<span class="progress-label is-blocked">${icon('pause')}Bloqué</span>`;
-  if (stage === 'cancelled') return '<span class="progress-label muted">Abandonné</span>';
+export function progressHTML(progress) {
   const p = Math.max(0, Math.min(100, Number(progress) || 0));
   return `<span class="progress" role="img" aria-label="Avancement ${p} %"><span class="progress-track"><span class="progress-fill${p === 100 ? ' done' : ''}" style="width:${p}%"></span></span><span class="progress-num">${p} %</span></span>`;
 }
@@ -86,32 +84,35 @@ export function cellHTML(settings, contract, col, derived, { today = todayISO() 
       return tagsHTML(settings, col.list, v, { max: 1 });
     case 'person':
       return personHTML(settings, v);
-    case 'date': {
-      if (isEmpty(v)) return '';
-      let cls = '';
-      if (col.key === 'echeance' && derived && derived.stage !== 'done' && derived.stage !== 'cancelled') {
-        const d = diffDays(today, v);
-        if (d < 0) cls = 'date-late'; else if (d <= (settings.alerts?.dueSoonDays ?? 7)) cls = 'date-soon';
-      }
-      return `<span class="date ${cls}">${cls === 'date-late' ? icon('alert') : ''}${esc(fmtDate(v))}</span>`;
-    }
+    case 'date':
+      return isEmpty(v) ? '' : `<span class="date">${esc(fmtDate(v))}</span>`;
     case 'number':
-      return isEmpty(v) ? '' : `<span class="num">${esc(fmtNumber(v, 2))}</span>`;
+      return isEmpty(v) ? '' : `<span class="num">${esc(fmtNumber(v, col.integer ? 0 : 2))}${col.unit ? `&nbsp;${esc(col.unit)}` : ''}</span>`;
+    case 'percent':
+      return isEmpty(v) ? '' : `<span class="num">${esc(fmtPercent(v))}</span>`;
     case 'url':
       return isEmpty(v) ? '' : `<a class="cell-link" href="${esc(safeUrl(v))}" target="_blank" rel="noopener noreferrer" data-tip="${esc(v)}">${icon('external')}<span>Ouvrir</span></a>`;
     case 'email':
       return isEmpty(v) ? '' : `<a class="cell-link" href="mailto:${esc(v)}">${esc(v)}</a>`;
     case 'checkbox':
-      return `<span class="checkmark${v ? ' on' : ''}" role="checkbox" aria-checked="${v ? 'true' : 'false'}">${v ? icon('check') : ''}</span>`;
+      return v ? `<span class="xmark" role="img" aria-label="${esc(col.label)} : oui">${esc(col.trueLabel || 'X')}</span>` : '';
     case 'longtext':
       return isEmpty(v) ? '' : `<span class="clip" data-tip="${esc(v)}">${esc(v)}</span>`;
     case 'computed': {
-      if (col.computed === 'progress') return derived ? progressHTML(derived.progress, derived.stage) : '';
-      if (col.computed === 'alerts') return derived ? alertsBadge(derived.alerts) : '';
-      if (col.computed === 'updated') {
-        return contract.updatedAt ? `<span class="updated" data-tip="${esc(fmtDateTime(contract.updatedAt))}${contract.updatedByName ? ` – ${esc(contract.updatedByName)}` : ''}">${esc(fmtRelative(contract.updatedAt))}${contract.updatedByName ? ` · ${esc(contract.updatedByName.split(' ')[0])}` : ''}</span>` : '';
+      const r = derived || {};
+      switch (col.computed) {
+        case 'progress': return derived ? progressHTML(derived.progress) : '';
+        case 'alerts': return derived ? alertsBadge(derived.alerts) : '';
+        case 'updated':
+          return contract.updatedAt ? `<span class="updated" data-tip="${esc(fmtDateTime(contract.updatedAt))}${contract.updatedByName ? ` – ${esc(contract.updatedByName)}` : ''}">${esc(fmtRelative(contract.updatedAt))}${contract.updatedByName ? ` · ${esc(contract.updatedByName.split(' ')[0])}` : ''}</span>` : '';
+        case 'sigN1Plus1': return r.sigN1Plus1 ? `<span class="date">${esc(fmtDate(r.sigN1Plus1))}</span>` : '';
+        case 'ecartN1': return r.ecartN1 === null || r.ecartN1 === undefined ? '' : `<span class="num">${esc(fmtSignedDays(r.ecartN1))}</span>`;
+        case 'controle': return r.controle ? `<span class="auto-flag">${icon('alert')}${esc(r.controle)}</span>` : '';
+        default: {
+          const n = r[col.computed];
+          return n === null || n === undefined ? '' : `<span class="num">${esc(String(n))}</span>`;
+        }
       }
-      return '';
     }
     default:
       return isEmpty(v) ? '' : `<span class="clip">${esc(v)}</span>`;
@@ -350,7 +351,7 @@ export function dateField(value, onCommit, { ariaLabel = 'Date', marks = [] } = 
 }
 
 export function milestoneMarks(settings) {
-  return (settings.milestones || []).map((m) => ({ date: m.date, label: m.label, tone: m.role === 'signature' ? 'critical' : m.role === 'cgv' ? 'brand' : 'muted' }));
+  return (settings.milestones || []).map((m) => ({ date: m.date, label: m.label, tone: m.role === 'signature' ? 'critical' : 'brand' }));
 }
 
 /* ------------------------------------------------ Champs de formulaire */
@@ -385,6 +386,7 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
       ta.rows = 2;
       ta.value = value ?? '';
       ta.placeholder = 'Ajouter…';
+      ta.setAttribute('aria-label', col.label);
       const fit = () => { ta.style.height = 'auto'; ta.style.height = `${Math.min(260, ta.scrollHeight + 2)}px`; };
       ta.addEventListener('input', fit);
       ta.addEventListener('blur', () => commit(ta.value.trim() || null));
@@ -404,6 +406,7 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'input fc-pick';
+      btn.setAttribute('aria-label', col.label);
       const paint = () => {
         let inner = '';
         if (col.type === 'person') inner = personHTML(settings, current);
@@ -428,13 +431,14 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
     case 'checkbox': {
       const lab = document.createElement('label');
       lab.className = 'switch';
-      lab.innerHTML = `<input type="checkbox"><span class="switch-track"><span class="switch-thumb"></span></span><span class="switch-text"></span>`;
+      lab.innerHTML = `<input type="checkbox" aria-label="${esc(col.label)}"><span class="switch-track"><span class="switch-thumb"></span></span><span class="switch-text"></span>`;
       const inp = lab.querySelector('input');
+      const yes = col.trueLabel && col.trueLabel !== 'X' ? col.trueLabel : 'Oui';
       inp.checked = !!value;
-      lab.querySelector('.switch-text').textContent = value ? 'Oui' : 'Non';
-      inp.addEventListener('change', () => { lab.querySelector('.switch-text').textContent = inp.checked ? 'Oui' : 'Non'; commit(inp.checked); });
+      lab.querySelector('.switch-text').textContent = value ? yes : 'Non';
+      inp.addEventListener('change', () => { lab.querySelector('.switch-text').textContent = inp.checked ? yes : 'Non'; commit(inp.checked); });
       wrap.appendChild(lab);
-      wrap.setValue = (v) => { current = v; inp.checked = !!v; lab.querySelector('.switch-text').textContent = v ? 'Oui' : 'Non'; };
+      wrap.setValue = (v) => { current = v; inp.checked = !!v; lab.querySelector('.switch-text').textContent = v ? yes : 'Non'; };
       break;
     }
     default: {
@@ -443,16 +447,21 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
       const inp = document.createElement('input');
       inp.className = 'input';
       inp.type = col.type === 'email' ? 'email' : 'text';
-      if (col.type === 'number') inp.inputMode = 'decimal';
-      inp.value = col.type === 'number' && !isEmpty(value) ? String(value).replace('.', ',') : value ?? '';
-      inp.placeholder = col.type === 'url' ? 'https://…' : col.type === 'number' ? '0' : '';
+      const numeric = col.type === 'number' || col.type === 'percent';
+      if (numeric) inp.inputMode = 'decimal';
+      const show = (v) => (isEmpty(v) ? '' : col.type === 'percent' ? fmtPercent(v) : col.type === 'number' ? String(v).replace('.', ',') : v);
+      inp.value = show(value) ?? '';
+      inp.placeholder = col.type === 'url' ? 'https://…' : col.type === 'percent' ? 'ex. 2,5 %' : '';
+      inp.setAttribute('aria-label', col.label);
       const parse = () => {
         const t = inp.value.trim();
         if (!t) return null;
-        if (col.type === 'number') {
-          const n = parseNumberInput(t);
-          if (n !== null) return n;
-          inp.value = isEmpty(current) ? '' : String(current).replace('.', ',');
+        if (numeric) {
+          let n = parseNumberInput(t);
+          if (n !== null && col.type === 'percent') n = Math.round(n * 1000) / 100000;
+          if (n !== null && col.integer) n = Math.round(n);
+          if (n !== null) { inp.value = show(n); return n; }
+          inp.value = show(current) ?? '';
           toast(`« ${t} » n'est pas un nombre : valeur inchangée.`, { type: 'warning' });
           return current;
         }
@@ -476,7 +485,7 @@ export function fieldControl(settings, col, value, onCommit, { readonly = false,
       wrap.appendChild(row);
       wrap.setValue = (v) => {
         current = v;
-        if (document.activeElement !== inp) inp.value = col.type === 'number' && !isEmpty(v) ? String(v).replace('.', ',') : v ?? '';
+        if (document.activeElement !== inp) inp.value = show(v) ?? '';
         wrap.updateLink?.();
       };
     }

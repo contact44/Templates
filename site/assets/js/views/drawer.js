@@ -1,5 +1,5 @@
-// Fiche contrat (panneau latéral) : tous les champs, étapes du statut, alertes,
-// commentaires, historique du contrat et relances par e-mail.
+// Fiche compte (panneau latéral) : tous les champs par thématique, étapes du REPORT GEN, alertes,
+// commentaires et historique de la ligne.
 
 import { icon } from '../ui/icons.js';
 import {
@@ -7,10 +7,10 @@ import {
 } from '../ui/components.js';
 import { confirmDialog, menu, toast } from '../ui/overlay.js';
 import { readHash, writeHash } from '../ui/nav.js';
-import { columnByKey, FIELD_GROUPS, listOptions, milestoneByRole } from '../core/schema.js';
-import { displayValue } from '../core/compute.js';
+import { columnByKey, FIELD_GROUPS, listOptions } from '../core/schema.js';
+import { stepIndex, stepStage } from '../core/compute.js';
 import {
-  addDays, copyText, diffDays, esc, fmtDate, fmtDateTime, fmtRelative, isEmpty,
+  copyText, esc, fmtDateTime, fmtRelative, isEmpty,
 } from '../core/utils.js';
 
 let state = null; // { id, el, tab, controls: Map, ctx }
@@ -28,12 +28,12 @@ export function openContract(ctx, id, { fromRoute = false, tab = null } = {}) {
   const { store } = ctx;
   const contract = store.getContract(id);
   if (!contract) {
-    if (store.state.loaded.contracts) toast('Ce contrat n’existe plus.', { type: 'warning' });
+    if (store.state.loaded.contracts) toast('Cette ligne n’existe plus.', { type: 'warning' });
     return;
   }
   const host = document.getElementById('drawer-root');
   if (!state) {
-    host.innerHTML = `<div class="drawer-backdrop"></div><aside class="drawer" role="dialog" aria-modal="false" aria-label="Fiche contrat" tabindex="-1"></aside>`;
+    host.innerHTML = `<div class="drawer-backdrop"></div><aside class="drawer" role="dialog" aria-modal="false" aria-label="Fiche compte" tabindex="-1"></aside>`;
     host.querySelector('.drawer-backdrop').addEventListener('click', () => closeContract());
     document.addEventListener('keydown', onKey);
     requestAnimationFrame(() => host.classList.add('open'));
@@ -69,7 +69,7 @@ export function updateDrawer(ctx, evt, payload) {
   if (!state) return;
   const c = ctx.store.getContract(state.id);
   if (!c) {
-    if (evt === 'data') { toast('Ce contrat vient d’être supprimé.', { type: 'warning' }); closeContract(); }
+    if (evt === 'data') { toast('Cette ligne vient d’être supprimée par un collègue.', { type: 'warning' }); closeContract(); }
     return;
   }
   if (evt === 'data') {
@@ -138,17 +138,17 @@ function render() {
       <div class="drawer-toprow">
         <span class="drawer-ref" id="dr-ref"></span>
         <div class="drawer-tools">
-          <button class="icon-btn" data-act="prev" data-tip="Contrat précédent" aria-label="Contrat précédent">${icon('chevronUp')}</button>
-          <button class="icon-btn" data-act="next" data-tip="Contrat suivant" aria-label="Contrat suivant">${icon('chevronDown')}</button>
+          <button class="icon-btn" data-act="prev" data-tip="Ligne précédente" aria-label="Ligne précédente">${icon('chevronUp')}</button>
+          <button class="icon-btn" data-act="next" data-tip="Ligne suivante" aria-label="Ligne suivante">${icon('chevronDown')}</button>
           <button class="icon-btn" data-act="more" data-tip="Plus d’actions" aria-label="Plus d’actions">${icon('more')}</button>
           <button class="icon-btn" data-act="close" data-tip="Fermer (Échap)" aria-label="Fermer">${icon('close')}</button>
         </div>
       </div>
-      <input class="drawer-title" id="dr-title" aria-label="Client / enseigne" spellcheck="false">
+      <div class="drawer-title-row"><input class="drawer-title" id="dr-title" aria-label="Client" spellcheck="false"><span id="dr-div"></span></div>
       <div class="drawer-meta" id="dr-meta"></div>
       <div class="drawer-peers" id="dr-peers"></div>
     </header>
-    <div class="stepper-wrap"><ol class="stepper" id="dr-steps" aria-label="Étapes du statut"></ol></div>
+    <div class="stepper-wrap"><ol class="stepper compact" id="dr-steps" aria-label="Étapes du dossier (REPORT PAR DIV)"></ol><p class="stepper-caption" id="dr-step-cap"></p></div>
     <div id="dr-alerts"></div>
     <nav class="tabs" role="tablist" id="dr-tabs"></nav>
     <div class="drawer-body" id="dr-body"></div>`;
@@ -197,16 +197,16 @@ function moreMenu(anchor) {
   const id = state.id;
   menu(anchor, [
     { label: 'Copier le lien vers cette fiche', icon: 'link', onClick: async () => { await copyText(`${location.origin}${location.pathname}#/suivi?c=${id}`); toast('Lien copié.', { type: 'success', timeout: 2000 }); } },
-    { label: 'Dupliquer le contrat', icon: 'copy', onClick: async () => { const nid = await store.duplicateContract(id); if (nid) { toast('Contrat dupliqué.', { type: 'success' }); openContract(ctx, nid); } } },
+    { label: 'Dupliquer (autre division)', icon: 'copy', onClick: async () => { const nid = await store.duplicateContract(id); if (nid) { toast('Ligne dupliquée : choisissez sa division.', { type: 'success' }); openContract(ctx, nid); } } },
     { divider: true },
     {
-      label: 'Supprimer le contrat', icon: 'trash', danger: true, onClick: async () => {
+      label: 'Supprimer la ligne', icon: 'trash', danger: true, onClick: async () => {
         const c = store.getContract(id);
-        const ok = await confirmDialog({ title: 'Supprimer ce contrat ?', message: `« ${c?.values.client} » sera supprimé pour tous les utilisateurs. Vous pourrez annuler juste après (Ctrl+Z).`, confirmLabel: 'Supprimer', danger: true });
+        const ok = await confirmDialog({ title: 'Supprimer cette ligne ?', message: `« ${c?.values.client}${c?.values.division ? ` (${c.values.division})` : ''} » sera supprimée pour tous les utilisateurs. Pour un compte qui n’est plus suivi, préférez le statut « Fermé ». Vous pourrez annuler juste après (Ctrl+Z).`, confirmLabel: 'Supprimer', danger: true });
         if (!ok) return;
         closeContract();
         await store.deleteContracts([id]);
-        toast('Contrat supprimé.', { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
+        toast('Ligne supprimée.', { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
       },
     },
   ], { placement: 'bottom-end' });
@@ -223,14 +223,14 @@ function refreshHeader() {
   const title = el.querySelector('#dr-title');
   if (document.activeElement !== title) title.value = c.values.client || '';
 
-  const statusCol = columnByKey(s, 'statut');
-  const cmCol = columnByKey(s, 'cm');
-  const prioCol = columnByKey(s, 'priorite');
+  el.querySelector('#dr-div').innerHTML = c.values.division ? optionChip(s, 'division', c.values.division) : '';
+  const pick = (key, html, label) => (columnByKey(s, key) ? `<button class="meta-pick" data-key="${key}" aria-label="${esc(label)}" data-tip="${esc(columnByKey(s, key).label)}">${html || `<span class="muted">${esc(label)}</span>`}${icon('chevronDown', 'caret')}</button>` : '');
   el.querySelector('#dr-meta').innerHTML = `
-    ${statusCol ? `<button class="meta-pick" data-key="statut" aria-label="Changer le statut">${optionChip(s, 'statut', c.values.statut) || '<span class="muted">Statut</span>'}${icon('chevronDown', 'caret')}</button>` : ''}
-    ${cmCol ? `<button class="meta-pick" data-key="cm" aria-label="Changer le contract manager">${personHTML(s, c.values.cm) || '<span class="muted">Contract manager</span>'}${icon('chevronDown', 'caret')}</button>` : ''}
-    ${prioCol ? `<button class="meta-pick" data-key="priorite" aria-label="Changer la priorité">${optionChip(s, prioCol.list, c.values.priorite) || '<span class="muted">Priorité</span>'}${icon('chevronDown', 'caret')}</button>` : ''}
-    <span class="meta-progress">${progressHTML(d?.progress, d?.stage)}</span>`;
+    ${pick('statutCompte', optionChip(s, 'statutCompte', c.values.statutCompte), 'Statut du compte')}
+    ${pick('cm', personHTML(s, c.values.cm), 'CM référent')}
+    ${pick('juriste', optionChip(s, 'juriste', c.values.juriste), 'Juriste')}
+    ${pick('reportDiv', optionChip(s, 'reportDiv', c.values.reportDiv), 'REPORT PAR DIV')}
+    <span class="meta-progress">${progressHTML(d?.progress)}</span>`;
   el.querySelectorAll('.meta-pick').forEach((b) => b.addEventListener('click', () => {
     const col = columnByKey(s, b.dataset.key);
     optionPicker(b, {
@@ -239,16 +239,16 @@ function refreshHeader() {
     });
   }));
 
-  // Étapes : statuts du parcours (hors bloqué / abandonné).
-  const statuses = listOptions(s, 'statut');
-  const flow = statuses.filter((o) => o.stage === 'todo' || o.stage === 'active' || o.stage === 'done');
-  const curIdx = flow.findIndex((o) => o.value === c.values.statut);
-  const off = statuses.find((o) => o.value === c.values.statut && (o.stage === 'blocked' || o.stage === 'cancelled'));
-  el.querySelector('#dr-steps').innerHTML = flow.map((o, i) => `<li class="step${i < curIdx ? ' done' : ''}${i === curIdx ? ' current' : ''}"><button type="button" data-value="${esc(o.value)}" data-tip="Passer au statut « ${esc(o.value)} »" aria-label="${esc(o.value)}${i === curIdx ? ' (statut actuel)' : ''}"><span class="step-dot">${i < curIdx || (i === curIdx && o.stage === 'done') ? icon('check') : ''}</span><span class="step-label">${esc(o.value)}</span></button></li>`).join('')
-    + (off ? `<li class="step off"><span class="step-off">${icon(off.stage === 'blocked' ? 'pause' : 'xCircle')}${esc(off.value)}</span></li>` : '');
+  // Étapes REPORT PAR DIV (numérotées ; libellé complet au survol et sous la frise) ; REPORT GEN en est déduit.
+  const flow = listOptions(s, 'reportDiv');
+  const curIdx = stepIndex(s, c);
+  el.querySelector('#dr-steps').innerHTML = flow.map((o, i) => { const st = stepStage(s, o); return `<li class="step stage-${esc(st)}${i < curIdx ? ' done' : ''}${i === curIdx ? ' current' : ''}"><button type="button" data-value="${esc(o.value)}" data-tip="${esc(o.value)}" aria-label="${esc(o.value)}${i === curIdx ? ' (étape actuelle)' : ''}"><span class="step-dot">${i < curIdx || (i === curIdx && st === 'done') ? icon('check') : i + 1}</span></button></li>`; }).join('');
+  el.querySelector('#dr-step-cap').innerHTML = curIdx >= 0
+    ? `<strong>Étape :</strong> ${esc(flow[curIdx].value)} <span class="muted">· REPORT GEN : ${esc(flow[curIdx].gen || '—')}</span>`
+    : '<span class="muted">Étape non renseignée : cliquez sur une étape.</span>';
   el.querySelector('#dr-steps').onclick = (e) => {
     const b = e.target.closest('button[data-value]');
-    if (b) store.updateField(state.id, 'statut', b.dataset.value);
+    if (b) store.updateField(state.id, 'reportDiv', b.dataset.value);
   };
   el.querySelector('#dr-alerts').innerHTML = d?.alerts?.length ? `<div class="drawer-alerts">${alertList(d.alerts)}</div>` : '';
 }
@@ -270,7 +270,6 @@ function refreshTabs() {
     { id: 'fiche', label: 'Fiche' },
     { id: 'comments', label: `Commentaires${nComments ? ` (${nComments})` : ''}` },
     { id: 'history', label: 'Historique' },
-    { id: 'mail', label: 'Relance' },
   ];
   const nav = state.el.querySelector('#dr-tabs');
   nav.innerHTML = tabs.map((t) => `<button role="tab" class="tab${t.id === state.tab ? ' active' : ''}" aria-selected="${t.id === state.tab}" data-tab="${t.id}">${esc(t.label)}</button>`).join('');
@@ -302,8 +301,7 @@ function renderTab() {
   state.controls = new Map();
   if (state.tab === 'fiche') renderFields(body);
   else if (state.tab === 'comments') renderComments(body);
-  else if (state.tab === 'history') renderHistory(body);
-  else renderMail(body);
+  else renderHistory(body);
 }
 
 function renderFields(body) {
@@ -312,13 +310,21 @@ function renderFields(body) {
   const c = store.getContract(state.id);
   const d = store.state.derived.get(state.id);
   body.innerHTML = '';
-  const skip = new Set(['client', 'statut', 'cm', 'priorite', '_alerts']);
+  const skip = new Set(['client', 'cm', 'juriste', 'statutCompte', 'reportDiv', '_alerts']);
+  const open = new Set(store.state.prefs.drawerGroups || ['cle', 'equipe', 'suivi', 'jalons', 'pilotage']);
   for (const g of FIELD_GROUPS) {
     const cols = s.columns.filter((col) => (col.group || 'autres') === g.id && !skip.has(col.key));
     if (!cols.length) continue;
-    const sec = document.createElement('section');
+    const sec = document.createElement('details');
     sec.className = 'field-group';
-    sec.innerHTML = `<h3 class="field-group-title">${esc(g.label)}</h3>`;
+    sec.open = open.has(g.id);
+    sec.style.setProperty('--c', g.color);
+    sec.innerHTML = `<summary class="field-group-title"><span class="fg-dot"></span>${esc(g.label)}<span class="fg-count">${cols.length}</span></summary>`;
+    sec.addEventListener('toggle', () => {
+      const set = new Set(store.state.prefs.drawerGroups || ['cle', 'equipe', 'suivi', 'jalons', 'pilotage']);
+      if (sec.open) set.add(g.id); else set.delete(g.id);
+      store.setPrefs({ drawerGroups: [...set] }, { silent: true });
+    });
     const grid = document.createElement('div');
     grid.className = 'field-grid';
     for (const col of cols) {
@@ -378,7 +384,7 @@ function renderComments(body) {
   thread.scrollTop = thread.scrollHeight;
 }
 
-const ACTION_LABEL = { create: 'a créé le contrat', delete: 'a supprimé le contrat', restore: 'a restauré le contrat', comment: 'a commenté', mail: 'a préparé une relance', import: 'a importé des données' };
+const ACTION_LABEL = { create: 'a créé la ligne', delete: 'a supprimé la ligne', restore: 'a restauré la ligne', comment: 'a commenté', mail: 'a préparé une relance', import: 'a importé des données', external: 'a modifié les données sur GitHub' };
 
 function renderHistory(body) {
   const { store } = state.ctx;
@@ -400,83 +406,7 @@ function renderHistory(body) {
         ${h.action === 'update' ? `<div class="tl-change"><span class="from">${esc(h.from || '∅')}</span>${icon('chevronRight')}<span class="to">${esc(h.to || '∅')}</span></div>` : h.to ? `<div class="tl-change"><span class="to">${esc(h.to)}</span></div>` : ''}
         <time class="tl-time">${esc(fmtDateTime(h.ts))}</time>
       </div>
-    </li>`).join('')}</ol>` : '<p class="muted center pad">Aucune modification enregistrée pour ce contrat.</p>';
-}
-
-function fillTemplate(text, ctx, contract) {
-  const { store } = ctx;
-  const s = store.state.settings;
-  const sig = milestoneByRole(s, 'signature');
-  const me = store.me();
-  const vals = {
-    saison: s.season.name,
-    annee: String(s.season.year || ''),
-    dateButoir: sig ? fmtDate(sig.date, 'long') : '',
-    joursButoir: sig ? String(Math.max(0, diffDays(store.state.today, sig.date))) : '',
-    moi: me.name,
-    cm: store.member(contract.values.cm)?.name || '',
-  };
-  for (const col of s.columns) {
-    if (col.type === 'computed') continue;
-    const v = displayValue(s, contract, col);
-    if (!(col.key in vals)) vals[col.key] = col.type === 'date' && contract.values[col.key] ? fmtDate(contract.values[col.key], 'long') : v;
-  }
-  return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in vals ? (vals[k] || '—') : m));
-}
-
-function renderMail(body) {
-  const { ctx } = state;
-  const { store } = ctx;
-  const s = store.state.settings;
-  const c = store.getContract(state.id);
-  const templates = s.emailTemplates || [];
-  const contactCol = s.columns.find((col) => col.type === 'email');
-  body.innerHTML = templates.length ? `
-    <div class="mail-form">
-      <label class="field"><span class="field-label">Modèle</span>
-        <select class="input" id="mail-tpl">${templates.map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></label>
-      <label class="field"><span class="field-label">Destinataire(s)</span><input class="input" id="mail-to" type="text" placeholder="adresse@client.fr ; autre@client.fr"></label>
-      <label class="field"><span class="field-label">Objet</span><input class="input" id="mail-subject" type="text"></label>
-      <label class="field"><span class="field-label">Message</span><textarea class="input textarea" id="mail-body" rows="11"></textarea></label>
-      <label class="check"><input type="checkbox" id="mail-follow" checked><span>Programmer la prochaine relance dans <input class="input input-xs" type="number" id="mail-days" min="1" max="60" value="${esc(s.automations?.followUpDays || 7)}"> jours (met à jour « Prochaine action » et « Échéance »)</span></label>
-      <div class="mail-actions">
-        <button class="btn btn-primary" id="mail-open">${icon('mail')}<span>Ouvrir dans la messagerie</span></button>
-        <button class="btn btn-secondary" id="mail-copy">${icon('copy')}<span>Copier le texte</span></button>
-      </div>
-      <p class="muted small">Les modèles se modifient dans Paramètres › Modèles de relance. Variables disponibles : {client}, {dateCgv}, {dateButoir}, {joursButoir}, {version}, {statut}, {kam}, {moi}…</p>
-    </div>` : '<p class="muted center pad">Aucun modèle de relance. Ajoutez-en dans Paramètres › Modèles de relance.</p>';
-  if (!templates.length) return;
-  const $ = (id) => body.querySelector(id);
-  const apply = () => {
-    const t = templates.find((x) => x.id === $('#mail-tpl').value) || templates[0];
-    $('#mail-subject').value = fillTemplate(t.subject, ctx, c);
-    $('#mail-body').value = fillTemplate(t.body, ctx, c);
-  };
-  if (contactCol && c.values[contactCol.key]) $('#mail-to').value = c.values[contactCol.key];
-  $('#mail-tpl').addEventListener('change', apply);
-  apply();
-  const after = async (how) => {
-    const t = templates.find((x) => x.id === $('#mail-tpl').value);
-    await store.logEvent(state.id, { action: 'mail', to: `${t?.name || 'Relance'} (${how})` });
-    if ($('#mail-follow').checked) {
-      const days = Math.max(1, Math.min(60, Number($('#mail-days').value) || 7));
-      const patch = { echeance: addDays(store.state.today, days) };
-      if (columnByKey(s, 'prochaineAction')) patch.prochaineAction = `Relancer si pas de retour : ${t?.name || 'relance'}`;
-      await store.updateFields(state.id, patch);
-      toast(`Prochaine relance programmée le ${fmtDate(patch.echeance)}.`, { type: 'success' });
-    }
-  };
-  $('#mail-open').addEventListener('click', async () => {
-    const to = $('#mail-to').value.split(/[;,\s]+/).filter(Boolean).join(';');
-    const href = `mailto:${encodeURIComponent(to).replace(/%3B/g, ';').replace(/%40/g, '@')}?subject=${encodeURIComponent($('#mail-subject').value)}&body=${encodeURIComponent($('#mail-body').value)}`;
-    window.location.href = href;
-    await after('messagerie');
-  });
-  $('#mail-copy').addEventListener('click', async () => {
-    const ok = await copyText(`Objet : ${$('#mail-subject').value}\n\n${$('#mail-body').value}`);
-    toast(ok ? 'Texte copié dans le presse-papiers.' : 'Copie impossible.', { type: ok ? 'success' : 'error', timeout: 2500 });
-    if (ok) await after('copie');
-  });
+    </li>`).join('')}</ol>` : '<p class="muted center pad">Aucune modification enregistrée pour cette ligne.</p>';
 }
 
 export function isEmptyValue(v) { return isEmpty(v); }

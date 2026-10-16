@@ -1,4 +1,4 @@
-// Barre de filtres commune (tableau de bord, suivi, pipeline, échéancier) :
+// Barre de filtres commune (suivi, pipeline, relances) :
 // recherche, filtres par champ et raccourcis. Les filtres s'appliquent à toutes les vues.
 
 import { icon } from '../ui/icons.js';
@@ -7,7 +7,7 @@ import { QUICK_VIEWS } from '../core/compute.js';
 import { columnByKey } from '../core/schema.js';
 import { debounce, esc } from '../core/utils.js';
 
-const DIMENSIONS = ['cm', 'statut', 'division', 'canal', 'priorite'];
+const DIMENSIONS = ['cm', 'juriste', 'division', 'reportDiv', 'statut', 'statutCompte'];
 
 export function filterBar(ctx, { quick = true, extra = '' } = {}) {
   const { store } = ctx;

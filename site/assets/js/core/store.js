@@ -1,17 +1,22 @@
 // État central de l'application : paramètres, contrats, commentaires, historique, présence.
 // Toutes les modifications passent par ici : automatisations, journal, annulation (Ctrl+Z).
 
-import { columnByKey, defaultSettings, listOptions, memberById, normalizeSettings } from './schema.js';
-import { deriveAll, displayValue, matchFilters } from './compute.js';
+import {
+  accountRoleOf, columnByKey, defaultSettings, listOptions, memberById, normalizeSettings, VIEW_PRESETS,
+} from './schema.js';
+import {
+  deriveAll, displayValue, genForStep, JALONS, kpis, matchFilters, weekToFreeze,
+} from './compute.js';
 import {
   deepClone, initials, isEmpty, norm, safeStorage, sameValue, todayISO, uid,
 } from './utils.js';
 
-const PREFS_KEY = 'saison:prefs';
+const PREFS_KEY = 'saison:prefs:v2';
 const DEFAULT_PREFS = {
   theme: 'light',
-  density: 'comfortable',
+  density: 'compact',
   hiddenColumns: null,
+  shownGroups: VIEW_PRESETS.suivi,
   columnWidths: {},
   sort: [{ key: 'ref', dir: 1 }],
   groupBy: '',
@@ -19,9 +24,11 @@ const DEFAULT_PREFS = {
   filters: { search: '', fields: {}, quick: '' },
   columnFilters: {},
   boardCollapsed: [],
-  dashboardDim: 'cm',
+  boardField: 'statut',
+  reportLang: 'fr',
+  divFilters: { group: '', cm: '', juriste: '' },
   meId: null,
-  lastView: 'dashboard',
+  lastView: 'accueil',
 };
 
 export const SETTINGS_LABELS = {
@@ -31,9 +38,14 @@ export const SETTINGS_LABELS = {
   lists: 'Listes de valeurs',
   listLabels: 'Listes de valeurs',
   columns: 'Colonnes',
-  alerts: 'Seuils d’alerte',
+  alerts: 'Seuils de pilotage',
   automations: 'Automatisations',
-  emailTemplates: 'Modèles de relance',
+  reporting: 'Regroupements des reportings',
+  home: 'Accueil',
+  homeNotes: 'Dernières modifications',
+  homeVigilance: 'Points de vigilance',
+  hebdo: 'Suivi hebdomadaire',
+  hebdoWeeks: 'Semaines figées',
 };
 
 export function createStore(backend, { seasonId = '2027' } = {}) {
@@ -107,11 +119,16 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   function meMember() {
     const team = state.settings.team || [];
     const u = state.user;
+    // Un choix explicite (« Qui suis-je ? ») prime : utile quand l'équipe partage une même clé d'accès.
+    if (state.prefs.meId) { const chosen = team.find((m) => m.id === state.prefs.meId); if (chosen) return chosen; }
+    if (u?.login) {
+      const byLogin = team.find((m) => m.github && norm(m.github) === norm(u.login));
+      if (byLogin) return byLogin;
+    }
     if (u?.email) {
       const byEmail = team.find((m) => m.email && norm(m.email) === norm(u.email));
       if (byEmail) return byEmail;
     }
-    if (state.prefs.meId) return team.find((m) => m.id === state.prefs.meId) || null;
     return null;
   }
 
@@ -137,36 +154,30 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
       user: actor.name,
       contractId: contract?.id || null,
       contractRef: contract?.values?.ref || '',
-      contractLabel: contract?.values?.client || '',
+      contractLabel: contract?.values?.client ? `${contract.values.client}${contract.values.division ? ` (${contract.values.division})` : ''}` : '',
       ...extra,
     };
   }
 
   /* ------------------------------------------------------ Automatisations */
 
+  /**
+   * Macro « HorodaterStatut » du classeur : toute saisie dans REPORT PAR DIV ou REPORT GEN date la colonne
+   * « Statut modifié le » (effacée si les deux statuts sont vidés).
+   */
   function automationsFor(contract, patch) {
-    const s = state.settings;
-    const auto = s.automations || {};
-    const statuses = listOptions(s, 'statut');
+    const auto = state.settings.automations || {};
     const extra = {};
-    if (auto.statusStampsDate && 'statut' in patch && !isEmpty(patch.statut)) {
-      const opt = statuses.find((o) => o.value === patch.statut);
-      const field = opt?.dateField;
-      if (field && columnByKey(s, field) && isEmpty(contract.values[field]) && !(field in patch)) extra[field] = state.today;
+    // REPORT GEN suit toujours l'étape REPORT PAR DIV (dont il n'est que la synthèse).
+    if ('reportDiv' in patch) {
+      const gen = isEmpty(patch.reportDiv) ? null : genForStep(state.settings, patch.reportDiv);
+      if (gen !== undefined && !sameValue(gen, contract.values.statut ?? null) && (gen || isEmpty(patch.reportDiv))) extra.statut = gen;
     }
-    if (auto.dateAdvancesStatus && !('statut' in patch)) {
-      let bestIdx = -1;
-      for (const [k, v] of Object.entries(patch)) {
-        if (isEmpty(v)) continue;
-        const idx = statuses.findIndex((o) => o.dateField === k);
-        if (idx > bestIdx) bestIdx = idx;
-      }
-      if (bestIdx >= 0) {
-        const curIdx = statuses.findIndex((o) => o.value === contract.values.statut);
-        const cur = statuses[curIdx];
-        const movable = curIdx < 0 || cur.stage === 'todo' || cur.stage === 'active';
-        if (movable && curIdx < bestIdx) extra.statut = statuses[bestIdx].value;
-      }
+    if (auto.stampStatusChange !== false && ('statut' in patch || 'reportDiv' in patch) && !isEmpty(contract.values.client ?? patch.client)) {
+      const gen = 'statut' in extra ? extra.statut : 'statut' in patch ? patch.statut : contract.values.statut;
+      const div = 'reportDiv' in patch ? patch.reportDiv : contract.values.reportDiv;
+      extra.statutModifieLe = isEmpty(gen) && isEmpty(div) ? null : state.today;
+      if (extra.statutModifieLe === (contract.values.statutModifieLe ?? null)) delete extra.statutModifieLe;
     }
     return extra;
   }
@@ -218,7 +229,8 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const clean = {};
     for (const [k, v] of Object.entries(patch)) {
       const col = columnByKey(state.settings, k);
-      if (col && (col.readonly || col.type === 'computed')) continue;
+      // Colonnes en lecture seule (réf., horodatage) : modifiables seulement par l'annulation et les automatisations.
+      if (col && (col.type === 'computed' || (col.readonly && opts.source !== 'undo' && !opts.system))) continue;
       if (!sameValue(contract.values[k], v)) clean[k] = v === undefined ? null : v;
     }
     if (!Object.keys(clean).length) return null;
@@ -314,7 +326,12 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     return start;
   }
 
-  /** Renumérote ses propres contrats dont la référence fait doublon avec un contrat créé avant. */
+  /**
+   * Références en double (créations simultanées sur deux postes) : dans chaque doublon, la ligne créée la
+   * première garde son numéro ; les autres reçoivent les numéros suivant le plus grand, dans un ordre calculé
+   * de la même façon sur tous les postes (date de création puis identifiant). Chaque poste ne réécrit que
+   * ses propres lignes : deux postes qui corrigent en même temps ne choisissent donc jamais le même numéro.
+   */
   let fixingRefs = false;
   async function fixDuplicateRefs() {
     if (fixingRefs || isOffline() || !state.user) return;
@@ -325,34 +342,51 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
       if (!byRef.has(r)) byRef.set(r, []);
       byRef.get(r).push(c);
     }
-    const mine = [];
+    const order = (a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id));
+    const losers = [];
     for (const group of byRef.values()) {
       if (group.length < 2) continue;
-      group.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
-      for (const c of group.slice(1)) if (c.createdBy === state.user.uid) mine.push(c);
+      group.sort(order);
+      losers.push(...group.slice(1));
     }
-    if (!mine.length) return;
+    if (!losers.length) return;
+    losers.sort(order);
+    let next = maxRefNumber() + 1;
+    const updates = losers.map((c) => ({ c, ref: formatRef(next++) })).filter((x) => x.c.createdBy === state.user.uid)
+      .map(({ c, ref }) => ({ id: c.id, patch: { ref } }));
+    if (!updates.length) return;
     fixingRefs = true;
     try {
-      let next = await reserveRefs(mine.length);
-      const updates = mine.map((c) => ({ id: c.id, patch: { ref: formatRef(next++) } }));
       const history = updates.map((u) => historyEntry(getContract(u.id), { action: 'update', field: 'ref', fieldLabel: 'Réf.', from: getContract(u.id).values.ref, to: u.patch.ref, auto: true }));
+      applyOptimistic(updates);
       await backend.updateContracts(updates, history, me());
+      try { await backend.setCounterAtLeast(next - 1); } catch { /* sans incidence */ }
     } catch { /* nouvel essai au prochain changement */ } finally { fixingRefs = false; }
   }
   let refTimer = null;
-  const scheduleRefCheck = () => { clearTimeout(refTimer); refTimer = setTimeout(fixDuplicateRefs, 2500); refTimer.unref?.(); };
+  const scheduleRefCheck = () => { clearTimeout(refTimer); refTimer = setTimeout(fixDuplicateRefs, 1500); refTimer.unref?.(); };
 
   function formatRef(n) {
-    return `${state.settings.season.refPrefix || 'C'}-${String(n).padStart(3, '0')}`;
+    const p = state.settings.season.refPrefix;
+    return p ? `${p}-${String(n).padStart(3, '0')}` : String(n);
+  }
+
+  function defaultNewValues() {
+    const s = state.settings;
+    const actif = listOptions(s, 'statutCompte').find((o) => o.role === 'actif')?.value || '';
+    return {
+      statutCompte: actif,
+      statut: listOptions(s, 'statut')[0]?.value || '',
+      reportDiv: listOptions(s, 'reportDiv')[0]?.value || '',
+      statutModifieLe: state.today,
+    };
   }
 
   /** Crée un contrat ; retourne son identifiant. */
   async function createContract(values = {}, opts = {}) {
     const id = uid();
     const start = await reserveRefs(1);
-    const statuses = listOptions(state.settings, 'statut');
-    const v = { statut: statuses[0]?.value || '', ...deepClone(values), ref: formatRef(start) };
+    const v = { ...defaultNewValues(), ...deepClone(values), ref: formatRef(start) };
     const meM = meMember();
     if (isEmpty(v.cm) && meM && opts.assignMe !== false) v.cm = meM.id;
     const contract = { id, values: v };
@@ -375,7 +409,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const values = deepClone(c.values);
     delete values.ref;
     values.client = `${values.client || 'Sans nom'} (copie)`;
-    return createContract(values);
+    return createContract(values, { assignMe: false });
   }
 
   async function deleteContracts(ids, opts = {}) {
@@ -392,16 +426,28 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
    * « replace » : supprime les contrats existants puis importe.
    */
   async function importContracts(rows, { mode = 'append', source = 'Excel', undoable = false } = {}) {
+    // L'étape DIV fait foi : REPORT GEN en est déduit.
+    rows = rows.map((v) => {
+      const gen = isEmpty(v.reportDiv) ? null : genForStep(state.settings, v.reportDiv);
+      return gen ? { ...v, statut: gen } : v;
+    });
     let toCreate = []; const updates = [];
     const actor = me();
     if (mode === 'update') {
+      // Une ligne par compte et par division : reconnue par sa référence, sinon par le couple client + division.
       const byRef = new Map(state.list.filter((c) => c.values.ref).map((c) => [norm(c.values.ref), c]));
-      const byClient = new Map(state.list.filter((c) => c.values.client).map((c) => [norm(c.values.client), c]));
+      const pair = (v) => `${norm(v.client)}|${norm(v.division)}`;
+      const byPair = new Map(state.list.filter((c) => c.values.client).map((c) => [pair(c.values), c]));
       for (const values of rows) {
-        const match = (values.ref && byRef.get(norm(values.ref))) || (values.client && byClient.get(norm(values.client)));
+        const sameRef = values.ref && byRef.get(norm(values.ref));
+        const match = (sameRef && norm(sameRef.values.client) === norm(values.client) ? sameRef : null) || (values.client && byPair.get(pair(values)));
         if (match) {
           const patch = {};
-          for (const [k, v] of Object.entries(values)) if (k !== 'ref' && !isEmpty(v) && !sameValue(match.values[k], v)) patch[k] = v;
+          for (const [k, v] of Object.entries(values)) {
+            if (k === 'ref' || isEmpty(v) || sameValue(match.values[k], v)) continue;
+            if ((k === 'client' || k === 'division') && norm(v) === norm(match.values[k])) continue; // même compte, autre casse
+            patch[k] = v;
+          }
           if (Object.keys(patch).length) updates.push({ id: match.id, patch });
         } else toCreate.push(values);
       }
@@ -413,10 +459,8 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const taken = new Set(mode === 'replace' ? [] : state.list.map((c) => norm(c.values.ref)));
     const needRef = toCreate.filter((v) => isEmpty(v.ref) || taken.has(norm(v.ref)));
     let next = needRef.length ? await reserveRefs(needRef.length) : 0;
-    const statuses = listOptions(state.settings, 'statut');
     const created = toCreate.map((values) => {
       const v = { ...values };
-      if (isEmpty(v.statut)) v.statut = statuses[0]?.value || '';
       if (isEmpty(v.ref) || taken.has(norm(v.ref))) v.ref = formatRef(next++);
       taken.add(norm(v.ref));
       return { id: uid(), values: v };
@@ -425,7 +469,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     if (maxImported) { try { await backend.setCounterAtLeast(maxImported); } catch { /* sans incidence */ } }
     const summary = historyEntry(null, {
       action: 'import',
-      to: `${source} : ${created.length} contrat(s) ajouté(s)${updates.length ? `, ${updates.length} mis à jour` : ''}${mode === 'replace' ? ' (remplacement complet)' : ''}`,
+      to: `${source} : ${created.length} ligne(s) ajoutée(s)${updates.length ? `, ${updates.length} mise(s) à jour` : ''}${mode === 'replace' ? ' (remplacement complet)' : ''}`,
     });
     for (let i = 0; i < created.length; i += 400) {
       await guardWrite(backend.createContracts(created.slice(i, i + 400), i === 0 ? [summary] : [], actor), 'l’import');
@@ -601,7 +645,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const history = await fullHistory();
     return {
       format: 'suivi-saison-contractuelle',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       seasonId,
       settings: deepClone(state.settings),
@@ -612,29 +656,81 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   }
 
   /**
-   * Prépare la saison suivante : mêmes clients et mêmes réglages, jalons décalés d'un an,
-   * éléments de négociation remis à zéro. Retourne un fichier de sauvegarde à restaurer
-   * dans la nouvelle saison.
+   * Prépare la saison suivante : mêmes comptes et mêmes réglages ; les dates et statuts de la saison
+   * passent dans l'historique N-1 ; jalons, statuts et suivi de la nouvelle saison sont remis à zéro.
+   * Retourne un fichier de sauvegarde à restaurer dans la nouvelle saison.
    */
   function nextSeasonBackup() {
     const s = deepClone(state.settings);
     const year = Number(s.season.year || new Date().getFullYear()) + 1;
+    const shiftYears = (text) => String(text || '').replace(/\b(20\d{2})\b/g, (m) => String(Number(m) + 1));
     const shift = (iso) => (iso ? `${Number(iso.slice(0, 4)) + 1}${iso.slice(4)}` : iso);
-    s.season = { ...s.season, year, name: String(s.season.name || '').replace(/\d{4}/, String(year)) || `Saison contractuelle ${year}`, refPrefix: String(s.season.refPrefix || '').replace(/\d{2}$/, String(year).slice(2)) };
-    s.milestones = (s.milestones || []).map((m) => ({ ...m, date: shift(m.date) }));
-    const keep = new Set(['client', 'groupe', 'canal', 'division', 'typeContrat', 'cm', 'kam', 'contactClient', 'priorite', 'ca']);
-    const first = listOptions(s, 'statut')[0]?.value || '';
+    s.season = { ...s.season, year, name: shiftYears(s.season.name) || `Saison contractuelle ${year}` };
+    s.milestones = (s.milestones || []).map((m) => ({ ...m, label: shiftYears(m.label), date: shift(m.date) }));
+    s.columns = s.columns.map((c) => ({ ...c, label: shiftYears(c.label) }));
+    for (const key of ['statut', 'reportDiv']) {
+      s.lists[key] = (s.lists[key] || []).map((o) => ({ ...o, value: shiftYears(o.value), ...(o.en ? { en: shiftYears(o.en) } : {}) }));
+    }
+    s.hebdo = { ...s.hebdo, start: shift(s.hebdo?.start), end: shift(s.hebdo?.end) };
+    s.hebdoWeeks = {};
+    s.homeNotes = '';
+    const toHisto = {
+      selms: 'n1Identifiant', objet: 'n1Objet', statut: 'n1ReportGen', reportDiv: 'n1ReportDiv', iso: 'n1Iso', attribution2026: 'n1Attribution',
+      receptionCc: 'n1ReceptionCc', revueAttribuee: 'n1RevueAttribuee', revueTerminee: 'n1RevueTerminee', approvalLancee: 'n1ApprovalLancee',
+      approvalTerminee: 'n1ApprovalTerminee', miseEnSignature: 'n1MiseEnSignature', signatureClient: 'n1SignatureClient', signatureSef: 'n1SignatureSef',
+      suiviCm: 'n1SuiviCm',
+    };
+    const reset = new Set(['selms', 'objet', 'iso', 'suiviCm', 'statutModifieLe', 'attribution2027', 'gag2027', 'esig2027', 'contratEdite', ...JALONS]);
+    const first = { statut: s.lists.statut[0]?.value || '', reportDiv: s.lists.reportDiv[0]?.value || '' };
     const contracts = state.list
-      .filter((c) => state.derived.get(c.id)?.stage !== 'cancelled')
+      .filter((c) => accountRoleOf(state.settings, c.values.statutCompte) !== 'ferme')
       .sort((a, b) => String(a.values.ref).localeCompare(String(b.values.ref), 'fr', { numeric: true }))
       .map((c, i) => {
-        const values = {};
-        for (const [k, v] of Object.entries(c.values)) if (keep.has(k)) values[k] = deepClone(v);
-        values.statut = first;
-        values.ref = `${s.season.refPrefix || 'C'}-${String(i + 1).padStart(3, '0')}`;
+        const values = deepClone(c.values);
+        for (const [from, to] of Object.entries(toHisto)) values[to] = deepClone(c.values[from] ?? null);
+        values.n1Attribution = c.values.attribution2026 ?? null;
+        values.attribution2026 = c.values.attribution2027 ?? null;
+        values.gag2026 = c.values.gag2027 ?? c.values.gag2026 ?? null;
+        values.esig2026 = c.values.esig2027 ?? c.values.esig2026 ?? null;
+        for (const k of reset) values[k] = null;
+        values.statut = c.values.statut ? first.statut : null;
+        values.reportDiv = c.values.reportDiv ? first.reportDiv : null;
+        values.ref = String(i + 1);
         return { id: uid(), values };
       });
-    return { format: 'suivi-saison-contractuelle', version: 1, exportedAt: new Date().toISOString(), seasonId: String(year), settings: s, contracts, comments: [], history: [] };
+    return { format: 'suivi-saison-contractuelle', version: 2, exportedAt: new Date().toISOString(), seasonId: String(year), settings: s, contracts, comments: [], history: [] };
+  }
+
+  /**
+   * Macro « Trier les comptes » : comptes ouverts d'abord (par client puis division), comptes fermés en bas
+   * (les plus récemment fermés d'abord), puis renumérotation de la colonne Réf.
+   */
+  async function sortAccounts() {
+    const s = state.settings;
+    const key = (c) => {
+      const closed = accountRoleOf(s, c.values.statutCompte) === 'ferme';
+      const year = Number(c.values.anneeFermeture) || 0;
+      return [closed ? 1 : 0, closed ? -year : 0, norm(c.values.client), norm(c.values.division)];
+    };
+    const ordered = state.list.slice().sort((a, b) => {
+      const ka = key(a); const kb = key(b);
+      for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+      return 0;
+    });
+    const refs = new Map(ordered.map((c, i) => [c.id, formatRef(i + 1)]));
+    const n = await bulkUpdate(ordered.map((c) => c.id), (c) => ({ ref: refs.get(c.id) }), { automations: false, label: 'Tri des comptes', history: false });
+    if (n) await logEvent(null, { action: 'sort', to: `Comptes triés (fermés en bas) et références renumérotées : ${n} ligne(s) déplacée(s)` });
+    return n;
+  }
+
+  /** Fige la ligne du suivi hebdomadaire (dernier vendredi passé) avec les chiffres du moment. */
+  async function freezeWeek() {
+    const date = weekToFreeze(state.settings, state.today);
+    if (!date) return null;
+    const k = kpis(state.settings, state.list, state.derived, state.today);
+    const hebdoWeeks = { ...deepClone(state.settings.hebdoWeeks || {}), [date]: { attendus: k.attendus, signes: k.signes, figeLe: Date.now(), par: me().name } };
+    await saveSettings({ hebdoWeeks }, `Semaine du ${date.split('-').reverse().join('/')} figée : ${k.signes} signés sur ${k.attendus}`);
+    return { date, ...hebdoWeeks[date] };
   }
 
   async function restoreBackup(data) {
@@ -645,7 +741,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const contracts = data.contracts.map((c) => ({ ...c, id: c.id || uid(), values: c.values || {} }));
     const counter = Math.max(0, ...contracts.map((c) => Number(String(c.values.ref || '').match(/(\d+)\s*$/)?.[1] || 0)));
     const actor = me();
-    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: `Restauration d’une sauvegarde (${contracts.length} contrats)` };
+    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: `Restauration d’une sauvegarde (${contracts.length} lignes)` };
     await guardWrite(backend.replaceAll({ settings, contracts, comments: data.comments || [], history: [entry], counter }), 'la restauration');
     undoStack.length = 0; redoStack.length = 0; emit('undo');
   }
@@ -653,17 +749,20 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   async function loadDemo(buildDemo) {
     const settings = deepClone(state.settings);
     const demo = buildDemo(settings, state.today);
-    const isDefaultTeam = (settings.team || []).every((m) => /^Contract Manager \d$/.test(m.name));
+    const isDefaultTeam = (settings.team || []).every((m) => /^(CM \d|Contract Manager \d)$/.test(m.name));
     if (isDefaultTeam) settings.team = demo.team;
+    const { lists, ...rest } = demo.settingsPatch || {};
+    if (lists) settings.lists = { ...settings.lists, ...lists };
+    Object.assign(settings, rest);
     const actor = me();
-    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: `Chargement des données de démonstration (${demo.contracts.length} contrats fictifs)` };
+    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: `Chargement des données de démonstration (${demo.contracts.length} lignes fictives)` };
     await guardWrite(backend.replaceAll({ settings, contracts: demo.contracts, comments: demo.comments, history: [entry, ...demo.history], counter: demo.counter }), 'le chargement de la démonstration');
     undoStack.length = 0; redoStack.length = 0; emit('undo');
   }
 
   async function clearAll() {
     const actor = me();
-    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: 'Suppression de tous les contrats' };
+    const entry = { id: uid(), ts: Date.now(), uid: actor.uid, user: actor.name, action: 'restore-all', to: 'Suppression de toutes les lignes' };
     await guardWrite(backend.replaceAll({ settings: deepClone(state.settings), contracts: [], comments: [], history: [entry], counter: 0 }), 'la suppression');
     undoStack.length = 0; redoStack.length = 0; emit('undo');
   }
@@ -708,7 +807,8 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
         recompute();
         emit('data', { reason: 'contracts', changes, remote, initial: !!meta.initial });
         if (remote.length) emit('remote', remote);
-        if (changes.some((c) => c.type === 'added')) scheduleRefCheck();
+        // Création ou renumérotation reçue : une référence peut maintenant faire doublon avec une des siennes.
+        if (changes.some((c) => c.type === 'added' || (c.type === 'modified' && c.remote))) scheduleRefCheck();
       },
       comments(list) { state.comments = list.slice().sort((a, b) => a.ts - b.ts); emit('comments'); },
       history(list) { state.history = list.slice().sort((a, b) => b.ts - a.ts); emit('history'); },
@@ -737,7 +837,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     undo, redo, canUndo: () => undoStack.length > 0, canRedo: () => redoStack.length > 0,
     saveSettings, renameListValue, replaceListValueInContracts, remapListValues, addListValue, countListValueUsage, replaceMemberInContracts,
     addComment, deleteComment, logEvent, contractHistory, olderHistory, fullHistory, dedupeHistory: dedupe,
-    exportBackup, restoreBackup, loadDemo, clearAll, nextSeasonBackup,
+    exportBackup, restoreBackup, loadDemo, clearAll, nextSeasonBackup, sortAccounts, freezeWeek,
     setPresence, peers, formatRef,
     member: (id) => memberById(state.settings, id),
   };
@@ -745,10 +845,10 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
 
 export function errorMessage(err, what) {
   const code = err?.code || '';
-  if (code.includes('permission-denied')) return 'Accès refusé : votre compte n’est pas autorisé à modifier ces données.';
+  if (code.includes('permission-denied')) return /GitHub|clé/.test(err?.message || '') ? err.message : 'Accès refusé : votre clé d’accès ne permet pas de modifier ces données.';
+  if (code.includes('rate-limited')) return err.message;
   if (code.includes('deleted-by-peer')) return err.message;
   if (code.includes('not-found')) return 'Cet élément n’existe plus (il a peut-être été supprimé par un autre utilisateur).';
   if (code.includes('unavailable')) return 'Connexion au serveur impossible. Les modifications seront envoyées dès le retour du réseau.';
-  if (code.includes('resource-exhausted')) return 'Quota Firebase dépassé pour aujourd’hui.';
   return `Échec de ${what || 'l’opération'} : ${err?.message || err}`;
 }

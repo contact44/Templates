@@ -1,6 +1,7 @@
-// Suivi des contrats : grille éditable façon tableur, partagée en temps réel.
-// Édition dans la cellule, navigation au clavier, copier-coller avec Excel, tri, filtres de colonne,
-// regroupement, sélection de lignes et actions groupées, indicateurs de présence des collègues.
+// Suivi CM : grille éditable façon tableur, partagée en temps réel (onglet « 1.Suivi CM » du classeur).
+// Thématiques repliables (Vue suivi, Tout afficher, Tout replier…), mise en forme conditionnelle,
+// édition dans la cellule, navigation au clavier, copier-coller avec Excel, tri, filtres de colonne,
+// regroupement, sélection de lignes et actions groupées, tri des comptes fermés en bas.
 
 import { icon } from '../ui/icons.js';
 import {
@@ -9,18 +10,22 @@ import {
 import { confirmDialog, menu, popover, toast } from '../ui/overlay.js';
 import { filterBar } from './filterbar.js';
 import {
-  coerceValue, compareSortValues, displayValue, sortValue,
+  cellTone, coerceValue, compareSortValues, displayValue, sortValue,
 } from '../core/compute.js';
-import { columnByKey, listOptions, SWATCHES } from '../core/schema.js';
 import {
-  debounce, esc, fmtMoneyK, fmtNumber, isEmpty, norm, parseTSV, pluralize, toTSV,
+  columnByKey, FIELD_GROUPS, groupById, listOptions, SWATCHES, VIEW_PRESETS,
+} from '../core/schema.js';
+import {
+  debounce, esc, fmtNumber, isEmpty, norm, parseTSV, pluralize, toTSV,
 } from '../core/utils.js';
 import { exportMenu, openImportDialog } from './importer.js';
 
 const SEL_W = 44;
-const GROUPABLE = ['statut', 'cm', 'canal', 'division', 'priorite', 'typeContrat'];
+const GROUPABLE = ['statut', 'reportDiv', 'cm', 'juriste', 'division', 'statutCompte', 'activite', 'objet'];
 // Colonnes conservées à l'impression (format A4 paysage).
-const PRINT_KEYS = new Set(['ref', 'client', 'cm', 'statut', '_progress', '_alerts', 'dateCgv', 'dateSignature', 'prochaineAction', 'echeance']);
+const PRINT_KEYS = new Set(['ref', 'client', 'division', 'statutCompte', 'cm', 'juriste', 'reportDiv', 'statut']);
+// Listes qui pilotent les calculs : leurs valeurs se créent dans les paramètres.
+const LOCKED_LISTS = new Set(['statut', 'reportDiv', 'statutCompte']);
 
 export function mount(el, ctx) {
   const { store } = ctx;
@@ -36,6 +41,11 @@ export function mount(el, ctx) {
   el.innerHTML = '<div class="page page-table"></div>';
   const page = el.firstElementChild;
   page.appendChild(fb.el);
+  const viewBar = document.createElement('div');
+  viewBar.className = 'viewbar';
+  viewBar.setAttribute('role', 'toolbar');
+  viewBar.setAttribute('aria-label', 'Thématiques affichées');
+  page.appendChild(viewBar);
   const bulkEl = document.createElement('div');
   bulkEl.className = 'bulkbar';
   bulkEl.hidden = true;
@@ -46,7 +56,7 @@ export function mount(el, ctx) {
     <div class="grid-scroll" tabindex="0" role="region" aria-label="Tableau de suivi des contrats (flèches pour se déplacer, Entrée pour modifier)">
       <table class="grid" aria-label="Contrats"><colgroup></colgroup><thead></thead><tbody></tbody></table>
     </div>
-    <div class="grid-foot"><button class="btn btn-ghost btn-sm" data-act="add">${icon('plus')}<span>Nouveau contrat</span></button><span class="grid-stats" aria-live="polite"></span><span class="grid-hint">Double-clic ou Entrée pour modifier · Ctrl+C / Ctrl+V avec Excel · Ctrl+Z pour annuler</span></div>`;
+    <div class="grid-foot"><button class="btn btn-ghost btn-sm" data-act="add">${icon('plus')}<span>Nouveau compte</span></button><span class="grid-stats" aria-live="polite"></span><span class="grid-hint">Double-clic ou Entrée pour modifier · Ctrl+C / Ctrl+V avec Excel · Ctrl+Z pour annuler</span></div>`;
   page.appendChild(card);
 
   const scroller = card.querySelector('.grid-scroll');
@@ -68,10 +78,48 @@ export function mount(el, ctx) {
 
   /* -------------------------------------------------- Colonnes et lignes */
 
+  const shownGroups = () => new Set(['cle', ...(store.state.prefs.shownGroups || VIEW_PRESETS.suivi)]);
+
+  function renderViewBar() {
+    const shown = shownGroups();
+    const s = store.state.settings;
+    const used = FIELD_GROUPS.filter((g) => g.id !== 'cle' && s.columns.some((c) => (c.group || 'autres') === g.id));
+    const same = (preset) => used.every((g) => shown.has(g.id) === preset.includes(g.id));
+    viewBar.innerHTML = `
+      <div class="viewbar-presets seg" role="group" aria-label="Affichage">
+        <button class="btn btn-sm ${same(VIEW_PRESETS.suivi) ? 'btn-secondary' : 'btn-ghost'}" data-preset="suivi" aria-pressed="${same(VIEW_PRESETS.suivi)}">Vue suivi</button>
+        <button class="btn btn-sm ${same(VIEW_PRESETS.tout) ? 'btn-secondary' : 'btn-ghost'}" data-preset="tout" aria-pressed="${same(VIEW_PRESETS.tout)}">Tout afficher</button>
+        <button class="btn btn-sm ${same(VIEW_PRESETS.replier) ? 'btn-secondary' : 'btn-ghost'}" data-preset="replier" aria-pressed="${same(VIEW_PRESETS.replier)}">Tout replier</button>
+      </div>
+      <div class="viewbar-groups">${used.map((g) => `<button class="group-chip${shown.has(g.id) ? ' on' : ''}" data-grp="${esc(g.id)}" style="--c:${esc(g.color)}" aria-pressed="${shown.has(g.id)}" data-tip="${esc(`${shown.has(g.id) ? 'Masquer' : 'Afficher'} : ${g.label}`)}">${esc(g.short)}</button>`).join('')}</div>
+      <button class="btn btn-sm btn-ghost" data-act="sort-accounts" data-tip="Comptes fermés en bas, puis renumérotation des références (macro « Trier les comptes »)">${icon('sort')}<span>Trier les comptes</span></button>`;
+  }
+
+  viewBar.addEventListener('click', async (e) => {
+    const pre = e.target.closest('[data-preset]');
+    if (pre) { store.setPrefs({ shownGroups: VIEW_PRESETS[pre.dataset.preset].filter((g) => g !== 'cle') }); return; }
+    const g = e.target.closest('[data-grp]');
+    if (g) {
+      const set = shownGroups();
+      if (set.has(g.dataset.grp)) set.delete(g.dataset.grp); else set.add(g.dataset.grp);
+      set.delete('cle');
+      store.setPrefs({ shownGroups: [...set] });
+      return;
+    }
+    if (e.target.closest('[data-act="sort-accounts"]')) {
+      const ok = await confirmDialog({ title: 'Trier les comptes ?', message: 'Les comptes fermés passent en bas du tableau (les plus récemment fermés d’abord), les autres sont classés par client puis par division, et la colonne « Réf. » est renumérotée pour toute l’équipe. Vous pourrez annuler (Ctrl+Z).', confirmLabel: 'Trier et renuméroter' });
+      if (!ok) return;
+      const n = await store.sortAccounts();
+      store.setPrefs({ sort: [{ key: 'ref', dir: 1 }] });
+      toast(n ? `${n} référence(s) renumérotée(s).` : 'Les comptes étaient déjà dans l’ordre.', { type: 'success', action: n ? { label: 'Annuler', fn: () => store.undo() } : null });
+    }
+  });
+
   function computeColumns() {
     const s = store.state.settings;
     const hidden = store.state.prefs.hiddenColumns;
-    cols = s.columns.filter((c) => (hidden ? !hidden.includes(c.key) : !c.hidden));
+    const shown = shownGroups();
+    cols = s.columns.filter((c) => shown.has(c.group || 'autres') || c.frozen).filter((c) => (hidden ? !hidden.includes(c.key) : !c.hidden));
     // Les colonnes figées doivent être en tête.
     const frozen = cols.filter((c) => c.frozen);
     cols = [...frozen, ...cols.filter((c) => !c.frozen)];
@@ -147,7 +195,21 @@ export function mount(el, ctx) {
     colgroup.innerHTML = `<col style="width:${SEL_W}px">${cols.map((c) => `<col data-key="${esc(c.key)}" style="width:${widthOf(c)}px">`).join('')}`;
     table.style.width = `${SEL_W + cols.reduce((a, c) => a + widthOf(c), 0)}px`;
     const allChecked = rows.length && rows.every((c) => selected.has(c.id));
-    thead.innerHTML = `<tr>
+    // Bandeau des thématiques (ligne 3 du classeur), au-dessus des intitulés.
+    const bands = [];
+    cols.forEach((col, i) => {
+      const gid = col.frozen ? '__frozen' : (col.group || 'autres');
+      const last = bands[bands.length - 1];
+      if (last && last.gid === gid) last.span++; else bands.push({ gid, span: 1, start: i });
+    });
+    const frozenW = cols.filter((c) => c.frozen).reduce((a, c) => a + widthOf(c), 0);
+    thead.innerHTML = `<tr class="band-row" aria-hidden="true"><th class="sel frozen band" style="left:0"></th>${bands.map((b) => {
+      if (b.gid === '__frozen') return `<th class="band frozen frozen-edge" colspan="${b.span}" style="left:${SEL_W}px;width:${frozenW}px;--c:${esc(groupById('cle').color)}"><span>${esc(groupById('cle').label)}</span></th>`;
+      const g = groupById(b.gid);
+      // Colonnes « Clé » non figées : prolongent le bandeau figé, sans répéter l'intitulé.
+      const label = b.gid === 'cle' && bands[0]?.gid === '__frozen' ? '' : g.label.replace(/ \(.*\)$/, '');
+      return `<th class="band${label ? '' : ' band-cont'}" colspan="${b.span}" style="--c:${esc(g.color)}"><span>${esc(label)}</span></th>`;
+    }).join('')}</tr><tr class="head-row">
       <th class="sel frozen" style="left:0"><label class="cbox-wrap" data-tip="Tout sélectionner"><input type="checkbox" data-act="all" ${allChecked ? 'checked' : ''} aria-label="Sélectionner toutes les lignes"></label></th>
       ${cols.map((col, i) => {
         const sIdx = sort.findIndex((x) => x.key === col.key);
@@ -167,7 +229,7 @@ export function mount(el, ctx) {
   }
 
   function cellClass(col) {
-    return `cell${PRINT_KEYS.has(col.key) ? '' : ' noprint'} t-${col.type}${col.frozen ? ' frozen' : ''}${col.readonly || col.type === 'computed' ? ' ro' : ''}${col.align === 'right' || col.type === 'number' ? ' right' : ''}`;
+    return `cell${PRINT_KEYS.has(col.key) ? '' : ' noprint'} t-${col.type}${col.frozen ? ' frozen' : ''}${col.readonly || col.type === 'computed' ? ' ro' : ''}${col.align === 'right' || col.type === 'number' || col.type === 'percent' ? ' right' : ''}`;
   }
 
   function rowHTML(c, r, lefts, lastFrozen) {
@@ -175,9 +237,12 @@ export function mount(el, ctx) {
     const d = store.state.derived.get(c.id);
     const today = store.state.today;
     const sel = selected.has(c.id);
-    return `<tr data-id="${esc(c.id)}" class="${sel ? 'selected' : ''}${d?.stage === 'done' ? ' is-done' : ''}${d?.stage === 'cancelled' ? ' is-cancelled' : ''}" aria-rowindex="${r + 2}">
+    return `<tr data-id="${esc(c.id)}" class="${sel ? 'selected' : ''}${d?.stage === 'done' ? ' is-done' : ''}${d?.closed ? ' is-closed' : ''}" aria-rowindex="${r + 3}">
       <td class="sel frozen" style="left:0"><label class="cbox-wrap"><input type="checkbox" data-row="${esc(c.id)}" ${sel ? 'checked' : ''} aria-label="Sélectionner ${esc(c.values.client || '')}"></label>${d?.level === 'critical' || d?.level === 'serious' ? `<span class="row-flag lvl-${d.level}"></span>` : ''}</td>
-      ${cols.map((col, i) => `<td data-r="${r}" data-c="${i}" class="${cellClass(col)}${i === lastFrozen ? ' frozen-edge' : ''}" ${col.frozen ? `style="left:${lefts[i]}px"` : ''}>${col.key === 'client' ? `<div class="client-cell"><span class="clip">${esc(c.values.client || '')}</span><button class="open-btn" data-open="${esc(c.id)}" tabindex="-1" aria-label="Ouvrir la fiche" data-tip="Ouvrir la fiche">${icon('maximize')}</button></div>` : cellHTML(s, c, col, d, { today })}</td>`).join('')}
+      ${cols.map((col, i) => {
+        const tone = d?.closed ? '' : cellTone(s, c, col, d);
+        return `<td data-r="${r}" data-c="${i}" class="${cellClass(col)}${tone ? ` ${tone}` : ''}${i === lastFrozen ? ' frozen-edge' : ''}" ${col.frozen ? `style="left:${lefts[i]}px"` : ''}>${col.key === 'client' ? `<div class="client-cell"><span class="clip">${esc(c.values.client || '')}</span><button class="open-btn" data-open="${esc(c.id)}" tabindex="-1" aria-label="Ouvrir la fiche" data-tip="Ouvrir la fiche">${icon('maximize')}</button></div>` : cellHTML(s, c, col, d, { today })}</td>`;
+      }).join('')}
     </tr>`;
   }
 
@@ -193,18 +258,18 @@ export function mount(el, ctx) {
     const out = [];
     rows = [];
     if (!store.state.list.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols.length + 1}">${emptyState({ iconName: 'sheet', title: 'Aucun contrat', text: 'Importez votre fichier Excel ou créez un premier contrat.', actions: `<button class="btn btn-primary" data-act="import">${icon('upload')}<span>Importer un fichier</span></button><button class="btn btn-secondary" data-act="add">${icon('plus')}<span>Nouveau contrat</span></button>` })}</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols.length + 1}">${emptyState({ iconName: 'sheet', title: 'Aucun compte', text: 'Importez votre fichier « Suivi CM » ou créez un premier compte.', actions: `<button class="btn btn-primary" data-act="import">${icon('upload')}<span>Importer un fichier</span></button><button class="btn btn-secondary" data-act="add">${icon('plus')}<span>Nouveau compte</span></button>` })}</td></tr>`;
       return;
     }
     if (!list.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols.length + 1}">${emptyState({ iconName: 'filter', title: 'Aucun contrat ne correspond aux filtres', actions: `<button class="btn btn-secondary" data-act="clear-filters">Effacer les filtres</button>` })}</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols.length + 1}">${emptyState({ iconName: 'filter', title: 'Aucun compte ne correspond aux filtres', actions: `<button class="btn btn-secondary" data-act="clear-filters">Effacer les filtres</button>` })}</td></tr>`;
       return;
     }
     if (groups) {
       for (const g of groups) {
         const isCol = collapsed.has(g.key);
-        const ca = g.items.reduce((a, c) => a + (Number(c.values.ca) || 0), 0);
-        out.push(`<tr class="group-row${isCol ? ' collapsed' : ''}"><td colspan="${cols.length + 1}"><button class="group-toggle" data-group="${esc(g.key)}" aria-expanded="${!isCol}">${icon('chevronDown', 'group-caret')}${g.member ? avatar(g.member, { title: false }) : `<span class="chip-dot" style="--c:${esc(g.color)}"></span>`}<strong>${esc(g.label)}</strong><span class="group-count">${g.items.length}</span>${ca ? `<span class="group-ca">${esc(fmtMoneyK(ca))}</span>` : ''}</button></td></tr>`);
+        const signed = g.items.filter((c) => store.state.derived.get(c.id)?.stage === 'done').length;
+        out.push(`<tr class="group-row${isCol ? ' collapsed' : ''}"><td colspan="${cols.length + 1}"><button class="group-toggle" data-group="${esc(g.key)}" aria-expanded="${!isCol}">${icon('chevronDown', 'group-caret')}${g.member ? avatar(g.member, { title: false }) : `<span class="chip-dot" style="--c:${esc(g.color)}"></span>`}<strong>${esc(g.label)}</strong><span class="group-count">${g.items.length}</span>${signed ? `<span class="group-ca">${signed} signé${signed > 1 ? 's' : ''}</span>` : ''}</button></td></tr>`);
         if (isCol) continue;
         for (const c of g.items) { out.push(rowHTML(c, rows.length, lefts, lastFrozen)); rows.push(c); }
       }
@@ -225,6 +290,7 @@ export function mount(el, ctx) {
     const activeRef = refOf(active);
     const anchorRef = refOf(anchor);
     computeColumns();
+    renderViewBar();
     renderBody();
     renderHead();
     ctx.navIds = rows.map((c) => c.id);
@@ -359,8 +425,7 @@ export function mount(el, ctx) {
     const s = store.state.settings;
     const derived = store.state.derived;
     const signed = rows.filter((c) => derived.get(c.id)?.stage === 'done').length;
-    const ca = rows.reduce((a, c) => a + (Number(c.values.ca) || 0), 0);
-    let txt = `<strong>${pluralize(rows.length, 'contrat', 'contrats')}</strong>${rows.length !== store.state.list.length ? ` sur ${store.state.list.length}` : ''} · ${signed} signé${signed > 1 ? 's' : ''}${ca ? ` · CA N-1 ${esc(fmtMoneyK(ca))}` : ''}`;
+    let txt = `<strong>${pluralize(rows.length, 'ligne', 'lignes')}</strong>${rows.length !== store.state.list.length ? ` sur ${store.state.list.length}` : ''} · ${signed} signée${signed > 1 ? 's' : ''}`;
     const b = rangeBounds();
     if (b && (b.r0 !== b.r1 || b.c0 !== b.c1)) {
       let n = 0; let sum = 0; let count = 0;
@@ -370,7 +435,7 @@ export function mount(el, ctx) {
           const col = cols[c];
           if (!col || !rows[r]) continue;
           const v = rows[r].values[col.key];
-          if (col.type === 'number' && !isEmpty(v)) { n++; sum += Number(v) || 0; }
+          if ((col.type === 'number' || col.type === 'percent') && !isEmpty(v)) { n++; sum += Number(v) || 0; }
         }
       }
       txt += ` <span class="range-stats">· Sélection : ${count} cellules${n ? ` · Somme ${esc(fmtNumber(sum, 2))} · Moyenne ${esc(fmtNumber(sum / n, 1))}` : ''}</span>`;
@@ -386,10 +451,9 @@ export function mount(el, ctx) {
     if (!selected.size) { bulkEl.hidden = true; bulkEl.innerHTML = ''; return; }
     const s = store.state.settings;
     bulkEl.hidden = false;
-    const editable = ['statut', 'cm', 'priorite', 'canal'].map((k) => columnByKey(s, k)).filter(Boolean);
+    const editable = ['reportDiv', 'cm', 'juriste', 'attribution2027', 'statutCompte'].map((k) => columnByKey(s, k)).filter(Boolean);
     bulkEl.innerHTML = `<span class="bulk-count"><strong>${selected.size}</strong> sélectionné${selected.size > 1 ? 's' : ''}</span>
       ${editable.map((col) => `<button class="btn btn-sm btn-ghost" data-bulk="${esc(col.key)}">${esc(col.label)}${icon('chevronDown')}</button>`).join('')}
-      ${columnByKey(s, 'echeance') ? `<button class="btn btn-sm btn-ghost" data-bulk-date="echeance">${icon('calendar')}Échéance</button>` : ''}
       <button class="btn btn-sm btn-ghost" data-act="bulk-export">${icon('download')}Exporter</button>
       <button class="btn btn-sm btn-ghost danger" data-act="bulk-delete">${icon('trash')}Supprimer</button>
       <button class="icon-btn" data-act="bulk-clear" aria-label="Désélectionner" data-tip="Désélectionner">${icon('close')}</button>`;
@@ -402,21 +466,10 @@ export function mount(el, ctx) {
     if (b) {
       const col = columnByKey(s, b.dataset.bulk);
       optionPicker(b, {
-        options: optionsForColumn(s, col), value: null, title: `${col.label} pour ${ids.length} contrat(s)`, emptyLabel: 'Effacer la valeur',
+        options: optionsForColumn(s, col), value: null, title: `${col.label} pour ${ids.length} ligne(s)`, emptyLabel: 'Effacer la valeur',
         onChange: async (v) => {
           const n = await store.bulkUpdate(ids, { [col.key]: v }, { label: 'Modification groupée' });
-          toast(`${n} contrat(s) mis à jour.`, { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
-        },
-      });
-      return;
-    }
-    const bd = e.target.closest('[data-bulk-date]');
-    if (bd) {
-      calendarPopover(bd, {
-        value: null, title: `Nouvelle échéance pour ${ids.length} contrat(s)`, marks: milestoneMarks(s),
-        onPick: async (v) => {
-          const n = await store.bulkUpdate(ids, { [bd.dataset.bulkDate]: v });
-          toast(`${n} échéance(s) mise(s) à jour.`, { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
+          toast(`${n} ligne(s) mise(s) à jour.`, { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
         },
       });
       return;
@@ -425,11 +478,11 @@ export function mount(el, ctx) {
     if (act === 'bulk-clear') { selected.clear(); render(); }
     if (act === 'bulk-export') exportMenu(e.target.closest('button'), ctx, { ids });
     if (act === 'bulk-delete') {
-      const ok = await confirmDialog({ title: `Supprimer ${ids.length} contrat(s) ?`, message: 'Les contrats sélectionnés seront supprimés pour tous les utilisateurs. Vous pourrez annuler juste après (Ctrl+Z).', confirmLabel: 'Supprimer', danger: true });
+      const ok = await confirmDialog({ title: `Supprimer ${ids.length} ligne(s) ?`, message: 'Les lignes sélectionnées seront supprimées pour tous les utilisateurs. Pour un compte qui n’est plus suivi, préférez le statut « Fermé ». Vous pourrez annuler juste après (Ctrl+Z).', confirmLabel: 'Supprimer', danger: true });
       if (!ok) return;
       await store.deleteContracts(ids);
       selected.clear();
-      toast(`${ids.length} contrat(s) supprimé(s).`, { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
+      toast(`${ids.length} ligne(s) supprimée(s).`, { type: 'success', action: { label: 'Annuler', fn: () => store.undo() } });
     }
   });
 
@@ -457,7 +510,7 @@ export function mount(el, ctx) {
         },
         onClose: () => scroller.focus({ preventScroll: true }),
         // Les statuts se créent dans les paramètres (ils pilotent les calculs).
-        allowCreate: col.type !== 'person' && col.list !== 'statut',
+        allowCreate: col.type !== 'person' && !LOCKED_LISTS.has(col.list),
       });
       return;
     }
@@ -492,8 +545,8 @@ export function mount(el, ctx) {
     const input = document.createElement('input');
     input.className = 'cell-input';
     input.type = 'text';
-    input.value = initial !== null ? initial : col.type === 'number' && !isEmpty(value) ? String(value).replace('.', ',') : value ?? '';
-    if (col.type === 'number') input.inputMode = 'decimal';
+    input.value = initial !== null ? initial : isEmpty(value) ? '' : col.type === 'number' ? String(value).replace('.', ',') : col.type === 'percent' ? displayValue(s, contract, col) : value;
+    if (col.type === 'number' || col.type === 'percent') input.inputMode = 'decimal';
     box.appendChild(input);
     td.classList.add('editing');
     td.appendChild(box);
@@ -503,7 +556,7 @@ export function mount(el, ctx) {
       commit: () => {
         const v = parse();
         if (col.key === 'client' && isEmpty(v)) { toast('Le nom du client est obligatoire.', { type: 'warning' }); return; }
-        if (col.type === 'number' && v === null && input.value.trim()) {
+        if ((col.type === 'number' || col.type === 'percent') && v === null && input.value.trim()) {
           toast(`« ${input.value.trim()} » n'est pas un nombre : valeur inchangée.`, { type: 'warning' });
           return;
         }
@@ -540,7 +593,7 @@ export function mount(el, ctx) {
   /* -------------------------------------------- Copier, couper, coller */
 
   function copyValue(col, v) {
-    if (isEmpty(v)) return '';
+    if (isEmpty(v) || v === false) return '';
     if (col.type === 'number') return String(v).replace('.', ',');
     return displayValue(store.state.settings, { values: { [col.key]: v } }, col);
   }
@@ -699,7 +752,7 @@ export function mount(el, ctx) {
         if (ctrl && k.toLowerCase() === 'a') { e.preventDefault(); anchor = { r: 0, c: 0 }; active = { r: rows.length - 1, c: cols.length - 1 }; paintSelection(); return; }
         if (!ctrl && !e.altKey && k.length === 1) {
           const col = cols[active.c];
-          if (['text', 'number', 'url', 'email', 'longtext', 'date'].includes(col.type) && !col.readonly) { e.preventDefault(); startEdit(active.r, active.c, { initial: k }); }
+          if (['text', 'number', 'percent', 'url', 'email', 'longtext', 'date'].includes(col.type) && !col.readonly) { e.preventDefault(); startEdit(active.r, active.c, { initial: k }); }
           else if (['select', 'person', 'multiselect'].includes(col.type)) { e.preventDefault(); startEdit(active.r, active.c); }
         }
     }
@@ -954,6 +1007,7 @@ export function mount(el, ctx) {
       if (evt === 'remote') schedule();
       if (evt === 'settings') schedule();
       if (evt === 'prefs') { fb.update(); applyDensity(); schedule(); }
+      if (evt === 'settings') renderViewBar();
       if (evt === 'presence') paintPresence();
     },
     route({ params }) { void params; },

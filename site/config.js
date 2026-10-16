@@ -1,32 +1,25 @@
 /*
- * Configuration de l'application « Suivi de la saison contractuelle ».
+ * Configuration de l'application « Suivi Contract Management — saison contractuelle ».
  *
- * MODE LOCAL (par défaut) : laissez `firebase: null`. Les données sont alors enregistrées
- * uniquement dans le navigateur de chaque utilisateur : rien n'est partagé.
+ * Les données sont enregistrées dans un dépôt GitHub (fichiers JSON) et modifiées en temps réel
+ * par toute personne disposant d'un accès (clé GitHub personnelle ou lien d'accès d'équipe).
+ * Voir docs/MISE-EN-LIGNE.md.
  *
- * MODE PARTAGÉ EN TEMPS RÉEL : remplacez `null` par la configuration Web de votre projet
- * Firebase (console Firebase › Paramètres du projet › Vos applications › Config), par exemple :
+ * IMPORTANT — confidentialité : utilisez un dépôt PRIVÉ pour les données. Le dépôt qui publie le site
+ * (GitHub Pages gratuit) est public : y enregistrer les données les rendrait lisibles par tout le monde.
  *
- *   firebase: {
- *     apiKey: "AIzaSy...",
- *     authDomain: "saison-contractuelle.firebaseapp.com",
- *     projectId: "saison-contractuelle",
- *     storageBucket: "saison-contractuelle.firebasestorage.app",
- *     messagingSenderId: "123456789012",
- *     appId: "1:123456789012:web:abcdef123456"
- *   },
- *
- * Ces valeurs ne sont pas secrètes : la protection des données repose sur la connexion
- * et sur les règles de sécurité Firestore (firebase/firestore.rules). Voir docs/MISE-EN-LIGNE.md.
+ * Pour travailler sans GitHub (données dans ce navigateur uniquement) : remplacez `github: { … }` par `github: null`.
  */
 window.APP_CONFIG = {
-  firebase: null,
+  github: {
+    owner: 'contact44',          // compte ou organisation GitHub propriétaire du dépôt de données
+    repo: 'suivi-cm-donnees',    // dépôt PRIVÉ qui contient les données (créé une fois, vide)
+    branch: '',                  // vide = branche par défaut du dépôt
+    root: 'suivi-cm',            // dossier des données dans le dépôt
+    pollMs: 5000,                // fréquence de lecture des modifications des autres (millisecondes)
+  },
 
   // Identifiant de la saison : changez-le (ex. "2028") pour démarrer une nouvelle saison
   // sans effacer la précédente.
   seasonId: '2027',
-
-  // Passez à true si le réseau de l'entreprise bloque la synchronisation en temps réel
-  // (l'indicateur reste sur « Connexion… » ou « Hors ligne » alors qu'Internet fonctionne).
-  forceLongPolling: false,
 };

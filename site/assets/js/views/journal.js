@@ -20,7 +20,7 @@ const PERIODS = [
   { id: '7', label: '7 derniers jours' },
   { id: '30', label: '30 derniers jours' },
 ];
-const ACTION_LABEL = { update: 'Modification', create: 'Création', delete: 'Suppression', restore: 'Restauration', comment: 'Commentaire', mail: 'Relance', import: 'Import', settings: 'Paramètres', 'restore-all': 'Données' };
+const ACTION_LABEL = { update: 'Modification', create: 'Création', delete: 'Suppression', restore: 'Restauration', comment: 'Commentaire', mail: 'Relance', import: 'Import', settings: 'Paramètres', 'restore-all': 'Données', sort: 'Tri des comptes', external: 'Modification sur GitHub' };
 
 export function mount(el, ctx) {
   const { store } = ctx;

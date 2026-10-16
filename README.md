@@ -1,64 +1,65 @@
-# Suivi de la saison contractuelle 2027
+# Suivi Contract Management — saison contractuelle 2027
 
-Application web de suivi des négociations annuelles (CGV, conventions L441-3, échéances, signatures),
-pensée pour remplacer le fichier Excel de suivi et permettre à plusieurs contract managers de le
-**modifier en même temps**. Elle est publiée sur GitHub Pages et s'appuie sur Firebase pour le partage en
-temps réel.
+Outil de suivi de la saison contractuelle par **compte client**, qui remplace le classeur « Fichier de suivi
+CM 2027 » : les mêmes informations, lisibles d'un coup d'œil et **modifiables en même temps** par toute
+l'équipe. Le site est publié sur GitHub Pages ;
+les données sont enregistrées dans un **dépôt GitHub privé** (un fichier par ligne, chaque modification est
+un commit), lu toutes les 5 secondes par chaque poste.
 
-![Tableau de bord](docs/img/tableau-de-bord.png)
+![Accueil](docs/img/accueil.png)
 
-## Fonctionnalités
+## L'outil
 
-- **Tableau de suivi façon Excel** : édition dans les cellules, navigation au clavier, copier-coller avec
-  Excel, tri, filtres de colonne, regroupement, sélection multiple et actions groupées, annulation (Ctrl+Z).
-- **Travail simultané** : les modifications de chacun apparaissent chez les autres en temps réel, champ par
-  champ, avec indication de qui est en ligne et de qui modifie quoi ; fonctionnement hors connexion.
-- **Tableau de bord** : compte à rebours jusqu'à la date butoir du 1er mars, jauges CGV / signatures / CA,
-  frise des jalons, pipeline, avancement par contract manager, division ou canal, rythme de signature.
-- **Alertes** sur les échéances légales (art. L441-3 du Code de commerce : CGV au plus tard trois mois avant
-  le 1er mars, convention au plus tard le 1er mars), les actions en retard et les blocages.
-- **Pipeline** par glisser-déposer, **échéancier** des actions et diagramme de Gantt de la saison.
-- **Fiche contrat** : étapes du statut, commentaires partagés, historique, relances par e-mail pré-remplies.
-- **Journal** complet et inaltérable de toutes les modifications.
-- **Paramétrable sans code** : jalons, équipe, statuts et listes, colonnes, automatisations, modèles d'e-mails.
-- **Import** du fichier Excel (y compris par copier-coller depuis un fichier protégé par DRM), **export**
-  Excel mis en forme, CSV, PDF, sauvegarde et restauration complètes.
-- Charte Samsung (bleu Samsung, blanc, boutons en pilule), thème clair et sombre, utilisable sur ordinateur,
-  tablette et téléphone.
+- **Tableau de bord** très visuel : compte à rebours jusqu'au 1er mars, dossiers par phase, nombre de dossiers
+  à chacune des 15 étapes REPORT PAR DIV, avancement par division, par CM et par juriste, dossiers qui
+  n'avancent plus, activité récente de l'équipe, notes partagées.
+- **Comptes clients** : une ligne par client, ses divisions et leur avancement en barres de progression,
+  sans défilement horizontal ; recherche, filtres (phase, CM, juriste, division), tri.
+- **Fiche du compte** : une carte par division avec son étape (un clic sur la barre suffit), l'équipe, les
+  jalons, la note de suivi ; les informations du client saisies une fois pour toutes ses divisions ;
+  échanges et activité de l'équipe.
+- **Une seule saisie : l'étape REPORT PAR DIV**. REPORT GEN, qui n'en est que la synthèse, est déduit
+  automatiquement (correspondance réglable), comme la date du dernier changement d'étape.
+- **Reportings** du fichier : général (synthèse, tableau TOTAL SEF / CE / IM, graphique FR / EN), par
+  division, suivi hebdomadaire et e-mail du vendredi (brouillon Outlook avec images).
+- **Travail à plusieurs** en temps réel, fusion des modifications simultanées, hors connexion, journal.
+- **Import** du classeur `.xlsm` (colonnes reconnues automatiquement) et **export** Excel mis en forme ;
+  vue tableur facultative pour les saisies en masse.
+- Charte Samsung, thèmes clair et sombre, ordinateur, tablette et téléphone.
 
 ## Démarrer
 
-- **Mise en ligne et configuration Firebase** : [docs/MISE-EN-LIGNE.md](docs/MISE-EN-LIGNE.md)
+- **Mise en ligne** (dépôt de données privé, clé d'accès, GitHub Pages, import du fichier) :
+  [docs/MISE-EN-LIGNE.md](docs/MISE-EN-LIGNE.md)
 - **Guide des contract managers** : [docs/GUIDE-UTILISATEUR.md](docs/GUIDE-UTILISATEUR.md)
+- **Aperçu sans installation** : `apercu-suivi-cm-2027.html` (un seul fichier, données fictives, à ouvrir
+  dans le navigateur ; reconstruit par `npm run preview`).
 
-Sans configuration, l'application fonctionne en **mode local** (données enregistrées dans le navigateur,
-non partagées) : pratique pour la découvrir, avec des données de démonstration fictives.
+> **Confidentialité** : les données (clients, signataires, conditions) vont **uniquement** dans le dépôt de
+> données **privé**. Ce dépôt-ci ne contient que l'application et des données de démonstration fictives.
 
-Pour l'essayer sur un poste : ouvrir un terminal dans le dossier et lancer `npx http-server site`, puis
-ouvrir l'adresse indiquée.
-
-## Organisation du dépôt
+## Organisation
 
 ```
-site/                     application publiée sur GitHub Pages
-  index.html, config.js   page et configuration (Firebase, saison)
-  assets/css/app.css      charte graphique
-  assets/js/core/         données, calculs, alertes, stockage local et Firebase, Excel
-  assets/js/ui/           composants (pastilles, calendrier, graphiques, fenêtres)
-  assets/js/views/        vues (tableau de bord, suivi, pipeline, échéancier, journal, paramètres)
-  vendor/                 Firebase et ExcelJS embarqués (aucun CDN externe)
-firebase/firestore.rules  règles de sécurité de la base
-docs/                     guides
-tests/                    tests unitaires, parcours navigateur, synchronisation à deux utilisateurs
-tools/                    reconstruction des dépendances embarquées
+site/                       application publiée sur GitHub Pages (aucune étape de compilation)
+  index.html, config.js     page et configuration (dépôt de données, saison)
+  assets/css/app.css        charte graphique
+  assets/js/core/           modèle du classeur, calculs, stockage GitHub et local, Excel, e-mail
+  assets/js/ui/             composants (pastilles, calendrier, graphiques, fenêtres)
+  assets/js/views/          écrans (tableau de bord, comptes, fiche compte, reportings, hebdo, journal…)
+  vendor/exceljs.min.js     lecture / écriture Excel embarquée (aucun CDN externe)
+docs/                       guides
+tests/                      tests unitaires, parcours navigateur, deux utilisateurs sur un GitHub simulé
+tools/                      aperçu autonome, dépendances embarquées
 ```
 
 ## Qualité
 
-- 29 tests unitaires (calculs d'alertes, dates et nombres saisis à la française, import Excel, automatisations,
-  annulation, renommage de listes, pagination du journal) ;
-- 35 étapes de test dans un vrai navigateur (édition, collage Excel, tri, filtres, fiche, pipeline, échéancier,
-  paramètres, import / export, sauvegarde, mobile) ;
-- 22 étapes de test à **deux utilisateurs simultanés** sur l'émulateur Firebase (temps réel, modifications
-  concurrentes, présence, hors ligne, suppressions concurrentes, liens directs, refus d'accès, journal inaltérable) ;
-- audit d'accessibilité automatique (axe-core) sans violation WCAG A/AA, en thème clair et sombre.
+| Commande | Contenu |
+|---|---|
+| `npm run test:unit` | tests des calculs (étape DIV → REPORT GEN, durées, jours à la même étape, N-1, contrôle des jalons), comptes clients, reportings, suivi hebdo, import du format « Suivi CM », export puis réimport, stockage GitHub (initialisation, fusion, conflits, droits) |
+| `npm run test:e2e` | parcours complets dans un vrai navigateur : tableau de bord, comptes, fiche compte (étape, jalons, champs client, divisions, commentaires), vue tableur, reportings, e-mail du vendredi (.eml), paramètres, import / export, sauvegarde, mobile |
+| `npm run test:sync` | 16 étapes à deux personnes sur un serveur GitHub simulé : connexion par clé et par lien, propagation, modifications simultanées, références uniques, hors ligne, suppression concurrente, clé en lecture seule, dépôt public signalé, déconnexion |
+
+Audit d'accessibilité (axe-core, WCAG A/AA) sans violation sur tous les écrans, en thème clair et sombre.
+L'import a été vérifié sur le classeur réel (211 lignes, totaux identiques à l'onglet 4.Rep Gen TAB).

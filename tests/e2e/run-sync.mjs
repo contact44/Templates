@@ -1,289 +1,221 @@
-// Scénario à deux utilisateurs connectés en même temps (émulateur Firebase) :
-// propagation en temps réel, modifications simultanées, présence, commentaires, journal,
-// mode hors ligne, suppression, et refus d'accès pour un compte non autorisé.
-import { assert, eq, launch, serve, step, summary, watchErrors } from './helpers.mjs';
+// Deux personnes connectées en même temps au même dépôt GitHub de données (serveur GitHub simulé) :
+// connexion par clé et par lien d'accès, initialisation du dépôt, propagation des modifications,
+// modifications simultanées (même ligne, même champ), commentaires, journal, hors ligne, suppression,
+// paramètres partagés, clé en lecture seule, dépôt public signalé, déconnexion.
+// Lancement : npm run test:sync
+import { assert, eq, launch, serve, step, summary } from './helpers.mjs';
+import { startMockGitHub } from './mock-github.mjs';
 
 const TODAY = '2026-10-16';
-const AUTH = 'http://127.0.0.1:9099';
-const PASSWORD = 'MotDePasse!2027';
-
-async function createUser(email) {
-  const r = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: PASSWORD, returnSecureToken: true }),
-  });
-  if (!r.ok) throw new Error(`Création du compte ${email} : ${r.status} ${await r.text()}`);
-}
-
+const REPO = 'equipe/donnees';
+const mock = await startMockGitHub({
+  latency: 30,
+  tokens: {
+    'github_pat_alice': { login: 'alice-cm', name: 'Alice Martin', email: 'alice@exemple.fr', repos: { [REPO]: 'write', 'equipe/public': 'write' } },
+    'github_pat_bruno': { login: 'bruno-cm', name: 'Bruno Petit', email: 'bruno@exemple.fr', repos: { [REPO]: 'write' } },
+    'github_pat_lecteur': { login: 'lecteur', name: 'Léa Lecture', email: '', repos: { [REPO]: 'read' } },
+  },
+  repos: { [REPO]: { private: true, defaultBranch: 'main' }, 'equipe/public': { private: false, defaultBranch: 'main' } },
+});
 const server = await serve();
 const browser = await launch();
-const url = `${server.url}?emulator=1&project=demo-saison&today=${TODAY}`;
+const appUrl = (repo = REPO) => `${server.url}?gh=${encodeURIComponent(mock.url)}&depot=${repo}&poll=500&today=${TODAY}`;
 const errors = [];
+const ignorable = (m) => /Failed to load resource|status of (304|401|403|404|409|422)/.test(m);
 
-async function openAs(email) {
+async function open() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'fr-FR' });
   const page = await context.newPage();
-  watchErrors(page, errors);
-  await page.goto(url);
-  await page.waitForSelector('.login-form');
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', PASSWORD);
-  await page.click('.login-form button[type="submit"]');
+  page.on('console', (m) => { if (m.type() === 'error' && !ignorable(m.text())) errors.push(`console: ${m.text()}`); });
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   return { context, page };
+}
+async function ready(page, identity) {
+  await page.waitForSelector('.shell', { timeout: 15000 });
+  if (identity) {
+    const opt = await page.waitForSelector('.identity-opt', { timeout: 4000 }).catch(() => null);
+    if (opt) { await page.click(`.identity-opt:nth-of-type(${identity})`); await page.waitForTimeout(200); }
+  }
 }
 
 const get = (page, fn, arg) => page.evaluate(([f, a]) => (0, eval)(`(${f})`)(window.__app.store, a), [fn.toString(), arg]);
-async function until(page, fn, arg, label, timeout = 8000) {
+async function until(page, fn, arg, label, timeout = 10000) {
   const t0 = Date.now();
   for (;;) {
     const v = await get(page, fn, arg).catch(() => null);
     if (v) return { value: v, ms: Date.now() - t0 };
     if (Date.now() - t0 > timeout) throw new Error(`Délai dépassé : ${label}`);
-    await page.waitForTimeout(100);
+    await new Promise((r) => setTimeout(r, 100));
   }
 }
+const files = async (repo = REPO) => (await fetch(`${mock.url}/__admin/files?repo=${encodeURIComponent(repo)}`)).json();
 
-console.log('Tests de synchronisation — deux utilisateurs, émulateur Firebase');
-// Remise à zéro de l'émulateur (comptes et données).
-await fetch(`${AUTH}/emulator/v1/projects/demo-saison/accounts`, { method: 'DELETE' });
-await fetch('http://127.0.0.1:8080/emulator/v1/projects/demo-saison/databases/(default)/documents', { method: 'DELETE' });
-await createUser('claire@test.local');
-await createUser('julien@test.local');
-await createUser('intrus@test.local');
+console.log('Tests de bout en bout — deux personnes sur le même dépôt GitHub (simulé)');
 
-const A = await openAs('claire@test.local');
-await A.page.waitForSelector('.shell', { timeout: 20000 });
-const B = await openAs('julien@test.local');
-await B.page.waitForSelector('.shell', { timeout: 20000 });
+const A = await open();
+const B = await open();
+let target = null; // identifiant d'une ligne partagée
 
-await step('Connexion des deux utilisateurs et création de la saison', async () => {
-  eq(await A.page.textContent('.mode-pill span'), 'Base partagée', 'mode Firebase (A)');
-  eq(await B.page.textContent('.mode-pill span'), 'Base partagée', 'mode Firebase (B)');
-  const settingsB = await until(B.page, (s) => s.state.loaded.settings && s.state.settings.season.name, null, 'paramètres');
-  eq(settingsB.value, 'Saison contractuelle 2027', 'paramètres partagés');
+await step('Connexion d’Alice par sa clé d’accès : dépôt vide initialisé', async () => {
+  await A.page.goto(appUrl());
+  await A.page.waitForSelector('.login-form');
+  await A.page.fill('input[name="token"]', 'mauvaise-cle');
+  await A.page.click('.login-form button[type="submit"]');
+  await A.page.waitForSelector('.login-error:not([hidden])');
+  await A.page.fill('input[name="token"]', 'github_pat_alice');
+  await A.page.click('.login-form button[type="submit"]');
+  await ready(A.page, 1);
+  const f = await files();
+  assert(Object.keys(f).some((p) => p.endsWith('suivi-cm/2027/parametres.json')), `paramètres créés dans le dépôt (${Object.keys(f).join(', ')})`);
+  assert(await A.page.isVisible('text=Base partagée GitHub'), 'mode partagé affiché');
 });
 
-await step('Chargement de la démonstration par A, visible chez B', async () => {
-  await A.page.click('button[data-act="demo"]');
-  await A.page.click('#confirm-ok');
-  const r = await until(B.page, (s) => s.state.list.length === 42, null, '42 contrats chez B');
-  console.log(`    (reçu chez B en ${r.ms} ms)`);
-  const team = await get(B.page, (s) => s.state.settings.team.map((m) => m.name));
-  eq(team, ['Camille Laurent', 'Julien Moreau'], 'équipe partagée');
+await step('Alice charge 62 lignes ; Bruno, arrivé par le lien d’accès, les reçoit', async () => {
+  await A.page.evaluate(async () => { const { buildDemo } = await import('./assets/js/core/demo.js'); await window.__app.store.loadDemo(buildDemo); });
+  await until(A.page, (s) => s.state.list.length === 62 && !s.state.backend.pendingCount(), null, 'envoi des 62 lignes', 20000);
+  const f = await files();
+  eq(Object.keys(f).filter((p) => p.includes('/contrats/')).length, 62, 'un fichier par ligne dans le dépôt');
+  await B.page.goto(`${appUrl()}#acces=github_pat_bruno&depot=${REPO}`);
+  await ready(B.page, 2);
+  assert(!B.page.url().includes('acces='), 'clé retirée de l’adresse');
+  await until(B.page, (s) => s.state.list.length === 62, null, 'Bruno voit les 62 lignes', 15000);
+  target = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'ALTO DISTRIBUTION' && c.values.division === 'AV').id);
 });
 
-await step('Associer les comptes aux membres de l’équipe (e-mail)', async () => {
-  await get(A.page, (s) => s.saveSettings({ team: s.state.settings.team.map((m) => ({ ...m, email: m.id === 'cm1' ? 'claire@test.local' : 'julien@test.local' })) }));
-  await until(B.page, (s) => s.me().name === 'Julien Moreau', null, 'B reconnu comme Julien Moreau');
-  eq(await get(A.page, (s) => s.me().name), 'Camille Laurent', 'A reconnue comme Camille Laurent');
+await step('Modification d’Alice visible chez Bruno en quelques secondes', async () => {
+  await get(A.page, (s, id) => s.updateField(id, 'kam', 'Kam d’Alice'), target);
+  const { ms } = await until(B.page, (s, id) => s.getContract(id)?.values.kam === 'Kam d’Alice', target, 'propagation');
+  console.log(`    (propagation en ${ms} ms)`);
 });
 
-await step('Une modification de A apparaît chez B en temps réel (avec surbrillance)', async () => {
-  await B.page.goto(`${url}#/suivi`);
-  await B.page.waitForSelector('tbody tr[data-id]');
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Alto Distribution').id);
-  const t0 = Date.now();
-  await get(A.page, (s, i) => s.updateField(i, 'groupe', 'Groupe modifié par Camille'), id);
-  await until(A.page, (s, i) => s.getContract(i)?.values.groupe === 'Groupe modifié par Camille', id, 'valeur chez A');
-  console.log(`    (affichée chez A en ${Date.now() - t0} ms)`);
-  const r = await until(B.page, (s, i) => s.getContract(i)?.values.groupe === 'Groupe modifié par Camille', id, 'valeur chez B');
-  console.log(`    (propagée en ${r.ms} ms)`);
-  await B.page.waitForSelector(`tr[data-id="${id}"] td.flash`, { timeout: 4000 });
-  const by = await get(B.page, (s, i) => s.getContract(i).updatedByName, id);
-  eq(by, 'Camille Laurent', 'auteur de la dernière modification');
-});
-
-await step('Modifications simultanées sur le même contrat : aucune perte', async () => {
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Brio Électro').id);
+await step('Modifications simultanées de deux champs de la même ligne : aucune perte', async () => {
   await Promise.all([
-    get(A.page, (s, i) => s.updateField(i, 'kam', 'KAM saisi par Camille'), id),
-    get(B.page, (s, i) => s.updateField(i, 'version', 'V9 (Julien)'), id),
+    get(A.page, (s, id) => s.updateField(id, 'suiviCm', 'Point Alice'), target),
+    get(B.page, (s, id) => s.updateField(id, 'juristesBinome', 'Binôme de Bruno'), target),
   ]);
-  for (const P of [A.page, B.page]) {
-    await until(P, (s, i) => { const c = s.getContract(i); return c && c.values.kam === 'KAM saisi par Camille' && c.values.version === 'V9 (Julien)'; }, id, 'les deux valeurs');
+  for (const [who, p] of [['Alice', A.page], ['Bruno', B.page]]) {
+    await until(p, (s, id) => s.getContract(id)?.values.suiviCm === 'Point Alice' && s.getContract(id)?.values.juristesBinome === 'Binôme de Bruno', target, `fusion chez ${who}`);
   }
 });
 
-await step('Même champ modifié par les deux : la dernière écriture gagne partout', async () => {
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Delta Hi-Fi').id);
-  await get(A.page, (s, i) => s.updateField(i, 'prochaineAction', 'Version A'), id);
-  await until(B.page, (s, i) => s.getContract(i).values.prochaineAction === 'Version A', id, 'A propagé');
-  await get(B.page, (s, i) => s.updateField(i, 'prochaineAction', 'Version B'), id);
-  await until(A.page, (s, i) => s.getContract(i).values.prochaineAction === 'Version B', id, 'B propagé chez A');
-});
-
-await step('Présence : A voit que B consulte une fiche', async () => {
-  const id = await get(B.page, (s) => s.state.list.find((c) => c.values.client === 'Cobalt Hypermarchés').id);
-  await B.page.evaluate((i) => window.__app.openContract(i), id);
-  await B.page.waitForSelector('.drawer .field-row');
-  await A.page.goto(`${url}#/suivi`);
-  await A.page.waitForSelector('tbody tr[data-id]');
-  await until(A.page, (s, i) => s.peers().some((p) => p.contractId === i && p.name === 'Julien Moreau'), id, 'présence de B');
-  await A.page.waitForSelector('#presence .presence-av:not(.me)', { timeout: 5000 });
-  await A.page.waitForSelector(`tr.peer-row[data-id="${id}"]`, { timeout: 5000 });
-  eq((await A.page.textContent('.presence-label')).trim(), '2 en ligne', 'compteur de présence');
-});
-
-await step('Commentaire de B visible chez A', async () => {
-  const id = await get(B.page, (s) => s.state.list.find((c) => c.values.client === 'Cobalt Hypermarchés').id);
-  await B.page.click('.drawer .tab[data-tab="comments"]');
-  await B.page.fill('.composer textarea', 'Julien : rendez-vous acheteur fixé.');
-  await B.page.click('.composer button[type="submit"]');
-  await until(A.page, (s, i) => s.state.comments.some((c) => c.contractId === i && c.user === 'Julien Moreau'), id, 'commentaire chez A');
-  await A.page.evaluate((i) => window.__app.openContract(i, { tab: 'comments' }), id);
-  await A.page.waitForSelector('.comment:has-text("rendez-vous acheteur fixé")');
-  await A.page.keyboard.press('Escape');
-  await B.page.keyboard.press('Escape');
-});
-
-await step('Paramètres partagés : un statut renommé par A est mis à jour chez B', async () => {
-  const lists = await get(A.page, (s) => JSON.parse(JSON.stringify(s.state.settings.lists)));
-  lists.statut.find((o) => o.value === 'Revue juridique').value = 'Revue Legal';
-  await get(A.page, async (s, l) => { await s.saveSettings({ lists: l }); await s.replaceListValueInContracts('statut', 'Revue juridique', 'Revue Legal'); }, lists);
-  await until(B.page, (s) => s.state.settings.lists.statut.some((o) => o.value === 'Revue Legal') && !s.state.list.some((c) => c.values.statut === 'Revue juridique'), null, 'statut renommé chez B');
-});
-
-await step('Journal : les actions des deux utilisateurs sont tracées', async () => {
-  const users = await until(A.page, (s) => { const u = new Set(s.state.history.map((h) => h.user)); return u.has('Camille Laurent') && u.has('Julien Moreau') ? [...u] : null; }, null, 'journal');
-  assert(users.value.length >= 2, 'deux auteurs');
-  const n = await get(B.page, (s) => s.state.history.filter((h) => h.action === 'update' && h.field === 'prochaineAction').length);
-  assert(n >= 2, 'modifications de prochaine action tracées');
-});
-
-await step('Hors ligne : les modifications sont conservées puis envoyées au retour du réseau', async () => {
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Fusion Store').id);
-  await A.context.setOffline(true);
-  await A.page.evaluate(() => window.dispatchEvent(new Event('offline')));
-  try {
-    const t0 = Date.now();
-    await get(A.page, (s, i) => s.updateField(i, 'commentaires', 'Saisi hors ligne'), id);
-    const local = await until(A.page, (s, i) => s.getContract(i).values.commentaires === 'Saisi hors ligne', id, 'visible localement');
-    console.log(`    (affichée localement en ${Date.now() - t0} ms, dont ${local.ms} ms d’attente)`);
-    await A.page.waitForSelector('#sync.sync-warn', { timeout: 5000 });
-    await B.page.waitForTimeout(1500);
-    assert(await get(B.page, (s, i) => s.getContract(i).values.commentaires !== 'Saisi hors ligne', id), 'pas encore chez B');
-  } finally {
-    await A.context.setOffline(false);
-    await A.page.evaluate(() => window.dispatchEvent(new Event('online')));
-  }
-  const r = await until(B.page, (s, i) => s.getContract(i).values.commentaires === 'Saisi hors ligne', id, 'synchronisé au retour du réseau', 45000);
-  console.log(`    (reçue chez B ${r.ms} ms après le retour du réseau)`);
-});
-
-await step('Suppression par A pendant que B consulte la fiche', async () => {
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Granit Télécom').id);
-  await B.page.evaluate((i) => window.__app.openContract(i), id);
-  await B.page.waitForSelector('.drawer .field-row');
-  await get(A.page, (s, i) => s.deleteContracts([i]), id);
-  await until(B.page, (s, i) => !s.getContract(i), id, 'suppression reçue');
-  await B.page.waitForSelector('.toast:has-text("supprimé")', { timeout: 5000 });
-  await B.page.waitForFunction(() => !document.querySelector('#drawer-root.open'), null, { timeout: 5000 });
-});
-
-await step('Création simultanée : références distinctes', async () => {
-  const [ida, idb] = await Promise.all([
-    get(A.page, (s) => s.createContract({ client: 'Créé par A' })),
-    get(B.page, (s) => s.createContract({ client: 'Créé par B' })),
+await step('Même champ modifié en même temps : les deux postes convergent', async () => {
+  await Promise.all([
+    get(A.page, (s, id) => s.updateField(id, 'juriste', 'Sophie Martin'), target),
+    get(B.page, (s, id) => s.updateField(id, 'juriste', 'Thomas Bernard'), target),
   ]);
-  const refs = await until(A.page, (s, ids) => { const a = s.getContract(ids[0]); const b = s.getContract(ids[1]); return a && b ? [a.values.ref, b.values.ref] : null; }, [ida, idb], 'deux contrats');
-  assert(refs.value[0] !== refs.value[1], `références différentes (${refs.value.join(' / ')})`);
+  await until(A.page, (s) => !s.state.backend.pendingCount(), null, 'envoi Alice');
+  await until(B.page, (s) => !s.state.backend.pendingCount(), null, 'envoi Bruno');
+  await new Promise((r) => setTimeout(r, 1500));
+  const a = await get(A.page, (s, id) => s.getContract(id).values.juriste, target);
+  const b = await get(B.page, (s, id) => s.getContract(id).values.juriste, target);
+  eq(a, b, 'même valeur des deux côtés');
+  assert(['Sophie Martin', 'Thomas Bernard'].includes(a), 'une des deux saisies');
 });
 
-await step('« Nouveau contrat » ouvre aussitôt sa fiche (mode partagé)', async () => {
-  await A.page.click('#new-btn');
-  await A.page.fill('.modal input', 'Client créé en ligne');
-  await A.page.click('#prompt-ok');
-  await A.page.waitForSelector('#drawer-root.open .drawer-title', { timeout: 5000 });
-  eq(await A.page.inputValue('.drawer-title'), 'Client créé en ligne', 'fiche ouverte');
-  assert(!(await A.page.$('.toast:has-text("n’existe plus")')), 'pas de faux message');
-  await A.page.keyboard.press('Escape');
-});
-
-await step('Saisie dans la fiche non interrompue par la création d’un contrat par un collègue', async () => {
-  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Créé par A').id);
-  await A.page.evaluate((i) => window.__app.openContract(i), id);
-  await A.page.waitForSelector('.drawer .field-row[data-key="kam"] input');
-  await A.page.click('.drawer .field-row[data-key="kam"] input');
-  await A.page.keyboard.type('Saisie en ');
-  await get(B.page, (s) => s.createContract({ client: 'Créé pendant la saisie' }));
-  await until(A.page, (s) => s.state.list.some((c) => c.values.client === 'Créé pendant la saisie'), null, 'création reçue');
-  await A.page.waitForTimeout(500);
-  await A.page.keyboard.type('cours');
-  const focused = await A.page.evaluate(() => document.activeElement?.closest('.field-row')?.dataset.key);
-  eq(focused, 'kam', 'le champ garde le focus');
-  eq(await A.page.inputValue('.drawer .field-row[data-key="kam"] input'), 'Saisie en cours', 'texte complet');
-  await A.page.keyboard.press('Enter');
-  await A.page.keyboard.press('Escape');
-});
-
-await step('Modification groupée hors ligne malgré un contrat supprimé entre-temps par un collègue', async () => {
-  const ids = await get(A.page, (s) => s.state.list.filter((c) => /Opale|Prisme|Quartz/.test(c.values.client)).map((c) => c.id));
-  eq(ids.length, 3, 'trois contrats');
-  await A.context.setOffline(true);
-  await A.page.evaluate(() => window.dispatchEvent(new Event('offline')));
-  try {
-    await get(B.page, (s, i) => s.deleteContracts([i]), ids[0]);
-    await until(B.page, (s, i) => !s.getContract(i), ids[0], 'suppression chez B');
-    // A ne voit pas encore la suppression et modifie les trois contrats.
-    await get(A.page, async (s, list) => { await s.bulkUpdate(list, { kam: 'Mise à jour groupée' }); }, ids);
-  } finally {
-    await A.context.setOffline(false);
-    await A.page.evaluate(() => window.dispatchEvent(new Event('online')));
+await step('Rafale de créations des deux côtés : références uniques', async () => {
+  await Promise.all([
+    get(A.page, async (s) => { for (let i = 0; i < 4; i++) await s.createContract({ client: `RAFALE A${i}`, division: 'AV' }); }),
+    get(B.page, async (s) => { for (let i = 0; i < 4; i++) await s.createContract({ client: `RAFALE B${i}`, division: 'TE' }); }),
+  ]);
+  await until(A.page, (s) => s.state.list.filter((c) => c.values.client?.startsWith('RAFALE')).length === 8, null, '8 lignes chez Alice', 15000);
+  const t0 = Date.now();
+  await until(B.page, (s) => s.state.list.filter((c) => c.values.client?.startsWith('RAFALE')).length === 8, null, '8 lignes chez Bruno', 30000)
+    .catch(async (e) => { console.log(JSON.stringify(await get(B.page, (s) => ({ n: s.state.list.filter((c) => c.values.client?.startsWith('RAFALE')).map((c) => c.values.client), pend: s.state.backend.pendingCount(), sync: s.state.sync })))); console.log(JSON.stringify(await get(A.page, (s) => ({ pend: s.state.backend.pendingCount(), sync: s.state.sync })))); throw e; });
+  console.log(`    (rafale reçue en ${Date.now() - t0} ms)`);
+  // Deux créations simultanées peuvent prendre le même numéro : chaque poste renumérote les siennes.
+  for (const [who, p] of [['Alice', A.page], ['Bruno', B.page]]) {
+    await until(p, (s) => { const r = s.state.list.map((c) => c.values.ref); return new Set(r).size === r.length && !s.state.backend.pendingCount(); }, null, `références uniques chez ${who}`, 30000)
+      .catch(async (e) => { console.log(JSON.stringify(await get(p, (s) => ({ u: s.state.user?.uid, sync: s.state.sync, pend: s.state.backend.pendingCount(), dup: s.state.list.filter((c, i, a) => a.some((d) => d !== c && d.values.ref === c.values.ref)).map((c) => [c.values.client, c.values.ref, c.createdBy, c.createdAt]) })))); throw e; });
   }
-  await until(B.page, (s, list) => list.slice(1).every((i) => s.getContract(i)?.values.kam === 'Mise à jour groupée'), ids, 'les deux autres contrats sont à jour', 45000);
-  assert(await get(B.page, (s, i) => !s.getContract(i), ids[0]), 'le contrat supprimé n’est pas recréé');
-  await A.page.waitForSelector('.toast:has-text("supprimé par un collègue")', { timeout: 10000 });
-  assert(!(await A.page.$('.denied')), 'pas d’écran « accès non autorisé »');
+  const ra = await get(A.page, (s) => s.state.list.map((c) => `${c.id}:${c.values.ref}`).sort());
+  await until(B.page, (s, x) => JSON.stringify(s.state.list.map((c) => `${c.id}:${c.values.ref}`).sort()) === x, JSON.stringify(ra), 'mêmes références des deux côtés', 15000);
 });
 
-await step('Journal complet : pagination sans perte (entrées simultanées)', async () => {
-  const all = await get(A.page, async (s) => (await s.fullHistory()).length);
-  const direct = await A.page.evaluate(async () => {
-    const fb = await import('/vendor/firebase.js');
-    const snap = await fb.getDocs(fb.collection(fb.getFirestore(), 'seasons', '2027', 'history'));
-    return snap.size;
-  });
-  eq(all, direct, 'toutes les entrées du journal');
+await step('Commentaire de Bruno dans la fiche, visible au journal d’Alice', async () => {
+  await get(B.page, (s, id) => s.addComment(id, 'Le KAM relance le client lundi.'), target);
+  await until(A.page, (s) => s.state.history.some((h) => h.action === 'comment' && h.to === 'Le KAM relance le client lundi.' && h.user), null, 'commentaire au journal', 15000);
+  await A.page.click('a[data-route="journal"]');
+  await A.page.waitForSelector('.j-row');
+  assert(await A.page.isVisible('.j-row:has-text("Le KAM relance le client lundi.")'), 'ligne du journal');
 });
 
-await step('Lien direct vers une fiche : ouverte après le chargement des données', async () => {
-  const { id, client } = await get(A.page, (s) => { const c = s.state.list.find((x) => x.values.client); return { id: c.id, client: c.values.client }; });
-  await B.page.goto(`${url}#/suivi?c=${encodeURIComponent(id)}`);
-  await B.page.waitForSelector('#drawer-root.open .drawer-title', { timeout: 15000 });
-  eq(await B.page.inputValue('.drawer-title'), client, 'fiche du lien ouverte');
-  assert(!(await B.page.$('.toast:has-text("n’existe plus")')), 'pas de faux message');
-  await B.page.keyboard.press('Escape');
+await step('Hors ligne : modifications conservées puis envoyées au retour du réseau', async () => {
+  await B.context.setOffline(true);
+  await get(B.page, (s, id) => s.updateField(id, 'receptionCc', '2026-10-30'), target);
+  await B.page.waitForTimeout(800);
+  assert(await get(B.page, (s) => s.state.backend.pendingCount() > 0), 'modification en attente');
+  eq(await get(A.page, (s, id) => s.getContract(id).values.receptionCc ?? null, target) === '2026-10-30', false, 'pas encore chez Alice');
+  await B.context.setOffline(false);
+  await B.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await until(A.page, (s, id) => s.getContract(id)?.values.receptionCc === '2026-10-30', target, 'reçu après reconnexion', 15000);
 });
 
-await step('Compte non autorisé : accès refusé, aucune donnée lue', async () => {
-  const C = await openAs('intrus@test.local');
-  await C.page.waitForSelector('.denied', { timeout: 15000 });
-  assert((await C.page.textContent('.denied h1')).includes('Accès non autorisé'), 'écran de refus');
+await step('Paramètres partagés : seuils de la charge équipe', async () => {
+  await get(A.page, (s) => s.saveSettings({ alerts: { ...s.state.settings.alerts, vigilanceDays: 7, blocageDays: 15 } }, 'Seuils'));
+  await until(B.page, (s) => s.state.settings.alerts.vigilanceDays === 7 && s.state.settings.alerts.blocageDays === 15, null, 'seuils reçus');
+  await get(B.page, (s) => s.saveSettings({ homeNotes: 'Note de Bruno' }, 'Note'));
+  await until(A.page, (s) => s.state.settings.homeNotes === 'Note de Bruno' && s.state.settings.alerts.vigilanceDays === 7, null, 'note reçue sans écraser les seuils');
+});
+
+await step('Suppression par Alice pendant que Bruno modifie la même ligne', async () => {
+  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'RAFALE A0').id);
+  await until(B.page, (s, i) => !!s.getContract(i), id, 'ligne connue de Bruno');
+  await Promise.all([get(A.page, (s, i) => s.deleteContracts([i]), id), get(B.page, (s, i) => s.updateField(i, 'kam', 'Trop tard'), id)]);
+  await until(A.page, (s, i) => !s.getContract(i) && !s.state.backend.pendingCount(), id, 'supprimée chez Alice');
+  await until(B.page, (s, i) => !s.getContract(i) && !s.state.backend.pendingCount(), id, 'supprimée chez Bruno', 15000);
+  await new Promise((r) => setTimeout(r, 1200));
+  eq(await get(A.page, (s, i) => !!s.getContract(i), id), false, 'pas de résurrection');
+});
+
+await step('Clé en lecture seule : consultation possible, enregistrement refusé et conservé', async () => {
+  const C = await open();
+  await C.page.goto(`${appUrl()}#acces=github_pat_lecteur&depot=${REPO}`);
+  await ready(C.page, 1);
+  await until(C.page, (s) => s.state.list.length > 60, null, 'lecture');
+  await get(C.page, (s, id) => s.updateField(id, 'kam', 'Essai lecteur'), target);
+  await C.page.waitForSelector('.toast:has-text("Read and write")', { timeout: 10000 });
+  assert(await get(C.page, (s) => s.state.backend.pendingCount() > 0), 'modification gardée en attente');
+  eq(await get(A.page, (s, id) => s.getContract(id).values.kam, target), 'Kam d’Alice', 'rien d’écrit dans le dépôt');
   await C.context.close();
 });
 
-await step('Règles : le journal ne peut pas être modifié', async () => {
-  const res = await A.page.evaluate(async () => {
-    const fb = await import('/vendor/firebase.js');
-    const db = fb.getFirestore();
-    const snap = await fb.getDocs(fb.query(fb.collection(db, 'seasons', '2027', 'history'), fb.limit(1)));
-    const ref = snap.docs[0].ref;
-    try { await fb.updateDoc(ref, { to: 'falsifié' }); return 'modifié'; } catch (e) { return e.code; }
-  });
-  eq(res, 'permission-denied', 'mise à jour du journal refusée');
+await step('Dépôt public : bandeau d’alerte de confidentialité', async () => {
+  const D = await open();
+  await D.page.goto(`${appUrl('equipe/public')}#acces=github_pat_alice&depot=equipe/public`);
+  await ready(D.page, 1);
+  await D.page.waitForSelector('.banner-danger');
+  assert((await D.page.textContent('.banner-danger')).includes('Dépôt public'), 'texte du bandeau');
+  await D.context.close();
 });
 
-await step('Déconnexion', async () => {
-  await A.page.click('#user-btn');
-  await A.page.click('.menu-item:has-text("Se déconnecter")');
-  await A.page.waitForSelector('.login-form', { timeout: 10000 });
+await step('Journal partagé : actions des deux personnes, avec leur nom', async () => {
+  await A.page.evaluate(() => window.__app.navigate('journal'));
+  await A.page.waitForTimeout(1500);
+  const users = await get(A.page, (s) => [...new Set(s.state.history.map((h) => h.user))]);
+  assert(users.length >= 2, `au moins deux auteurs (${users.join(', ')})`);
 });
 
-await step('Aucune erreur inattendue dans la console', async () => {
-  const unexpected = errors.filter((e) => !/NOT_FOUND: no entity to update|evaluation error|Failed to load resource: the server responded with a status of 40[03]|permission-denied|Missing or insufficient permissions|ERR_INTERNET_DISCONNECTED|net::ERR|Could not reach Cloud Firestore|WebChannelConnection|offline/i.test(e));
-  eq(unexpected, [], 'erreurs');
+await step('Déconnexion : la clé est effacée de ce navigateur', async () => {
+  await B.page.click('#user-btn');
+  await B.page.click('.menu-item:has-text("se déconnecter")');
+  const confirm = await B.page.waitForSelector('#confirm-ok', { timeout: 1500 }).catch(() => null);
+  if (confirm) await confirm.click();
+  await B.page.waitForSelector('.login-form', { timeout: 10000 });
+  eq(await B.page.evaluate(() => localStorage.getItem('saison:gh-token')), null, 'clé supprimée');
+});
+
+await step('Conflits réellement provoqués puis résolus par le serveur simulé', async () => {
+  const stats = await (await fetch(`${mock.url}/__admin/stats`)).json();
+  console.log(`    (${stats.requests} requêtes, ${stats.writes} écritures, ${stats.conflicts} conflit(s) résolu(s))`);
+  assert(stats.conflicts >= 1, 'au moins un conflit d’écriture rencontré');
+});
+
+await step('Aucune erreur dans la console', async () => {
+  eq(errors, [], 'erreurs');
 });
 
 const failures = summary();
 await browser.close();
 await server.close();
+await mock.close();
 process.exit(failures ? 1 : 0);

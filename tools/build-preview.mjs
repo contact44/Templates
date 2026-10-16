@@ -1,12 +1,19 @@
-// Construit un aperçu autonome : un seul fichier HTML (mode local, données fictives), sans serveur.
-// Usage : node tools/build-preview.mjs [fichier de sortie]
+// Construit un aperçu autonome : un seul fichier HTML (mode local), sans serveur ni connexion.
+// Usage : node tools/build-preview.mjs [fichier de sortie] [--data sauvegarde.json]
+//   sans --data : données fictives de démonstration ;
+//   avec --data : données d'une sauvegarde de l'application (à ne jamais publier ni déposer sur GitHub).
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const out = process.argv[2] || join(root, 'dist/apercu-saison-contractuelle.html');
+const args = process.argv.slice(2);
+const di = args.indexOf('--data');
+const dataFile = di >= 0 ? args.splice(di, 2)[1] : null;
+const out = args[0] || join(root, 'dist/apercu-suivi-cm-2027.html');
+const previewData = dataFile ? JSON.parse(readFileSync(dataFile, 'utf8')) : null;
+const config = { github: null, seasonId: previewData ? 'apercu-donnees-2027' : 'apercu-2027', preview: true, ...(previewData ? { previewData } : {}) };
 mkdirSync(dirname(out), { recursive: true });
 
 const js = await build({
@@ -25,11 +32,11 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Saison contractuelle 2027 – aperçu</title>
+<title>Suivi CM 2027 – aperçu${previewData ? ' (vos données)' : ''}</title>
 <link rel="icon" href="data:image/svg+xml;base64,${favicon}">
 <style>${css}</style>
-<script>try{var p=JSON.parse(localStorage.getItem('saison:prefs')||'{}');document.documentElement.dataset.theme=p.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}catch(e){}</script>
-<script>window.APP_CONFIG={firebase:null,seasonId:'apercu-2027',preview:true};</script>
+<script>try{var p=JSON.parse(localStorage.getItem('saison:prefs:v2')||'{}');document.documentElement.dataset.theme=p.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}catch(e){}</script>
+<script>window.APP_CONFIG=${safe(JSON.stringify(config))};</script>
 </head>
 <body>
 <div id="app"><div class="boot"><div class="boot-spinner" aria-label="Chargement"></div></div></div>

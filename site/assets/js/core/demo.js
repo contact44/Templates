@@ -1,202 +1,199 @@
-// Données de démonstration FICTIVES (clients, interlocuteurs, montants inventés),
-// générées de façon cohérente avec la date du jour et les jalons de la saison.
+// Données de démonstration FICTIVES (clients, sociétés, interlocuteurs et numéros inventés),
+// dans la structure du classeur « Suivi CM » : une ligne par compte et par division, à différents
+// stades de la saison, avec leurs jalons, notes de suivi et historique N-1. Les dates sont calculées par
+// rapport au jour courant pour que l'aperçu reste cohérent.
 
-import { listOptions, milestoneByRole } from './schema.js';
-import { addDays, clamp, diffDays, todayISO, uid } from './utils.js';
+import { listOptions } from './schema.js';
+import { addDays, todayISO } from './utils.js';
 
+export const DEMO_TEAM = [
+  { id: 'camille', name: 'Camille Laurent', email: 'camille.laurent@exemple.fr', github: '', initials: 'CL', color: '#1428a0', role: 'Contract Manager' },
+  { id: 'julien', name: 'Julien Moreau', email: 'julien.moreau@exemple.fr', github: '', initials: 'JM', color: '#eb6834', role: 'Contract Manager' },
+];
+const JURISTES = ['Sophie Martin', 'Thomas Bernard', 'Léa Petit (cabinet)', 'Hugo Roux (cabinet)'];
+
+// [client, activité, forme sociale, ville, divisions]
 const CLIENTS = [
-  ['Alto Distribution', 'Groupe Alto', 'Spécialiste (GSS)'],
-  ['Brio Électro', 'Centrale Brio', 'Spécialiste (GSS)'],
-  ['Cobalt Hypermarchés', 'Cobalt Achats', 'Grande distribution (GSA)'],
-  ['Delta Hi-Fi', '', 'Spécialiste (GSS)'],
-  ['Écho Multimédia', 'Groupe Écho', 'Spécialiste (GSS)'],
-  ['Fusion Store', '', 'E-commerce'],
-  ['Granit Télécom', 'Granit Group', 'Opérateur télécom'],
-  ['Hélios Market', 'Cobalt Achats', 'Grande distribution (GSA)'],
-  ['Iris Online', '', 'E-commerce'],
-  ['Jade Pro Solutions', '', 'B2B / Intégrateur'],
-  ['Kappa Mobile', 'Granit Group', 'Opérateur télécom'],
-  ['Lumen Supermarchés', 'Lumen Coopérative', 'Grande distribution (GSA)'],
-  ['Mistral Électroménager', '', 'Spécialiste (GSS)'],
-  ['Nova Marketplace', '', 'E-commerce'],
-  ['Opale Cuisines', 'Réseau Opale', 'Cuisiniste / Installateur'],
-  ['Prisme Informatique', '', 'B2B / Intégrateur'],
-  ['Quartz Distribution', '', 'Grossiste'],
-  ['Rubis Hyper', 'Lumen Coopérative', 'Grande distribution (GSA)'],
-  ['Saphir Connect', '', 'Opérateur télécom'],
-  ['Topaze Électro', 'Groupe Alto', 'Spécialiste (GSS)'],
-  ['Ultra Bureau', '', 'B2B / Intégrateur'],
-  ['Vega Retail', 'Centrale Brio', 'Spécialiste (GSS)'],
-  ['Wapiti Maison', '', 'Spécialiste (GSS)'],
-  ['Xénon Gaming', '', 'E-commerce'],
-  ['Yuzu Store', '', 'E-commerce'],
-  ['Zénith Grossiste', '', 'Grossiste'],
-  ['Arcade Numérique', 'Groupe Écho', 'Spécialiste (GSS)'],
-  ['Boréal Habitat', 'Réseau Opale', 'Cuisiniste / Installateur'],
-  ['Cèdre Collectivités', '', 'B2B / Intégrateur'],
-  ['Dune Mobile', '', 'Opérateur télécom'],
-  ['Émeraude Proxi', 'Lumen Coopérative', 'Grande distribution (GSA)'],
-  ['Falcon IT Services', '', 'B2B / Intégrateur'],
-  ['Galet Électroménager', 'Centrale Brio', 'Spécialiste (GSS)'],
-  ['Horizon Duty Free', '', 'Autre'],
-  ['Indigo Hôtellerie', '', 'B2B / Intégrateur'],
-  ['Jasmin Express', '', 'E-commerce'],
-  ['Koala Électro', '', 'Spécialiste (GSS)'],
-  ['Lagon Outre-mer', '', 'Grossiste'],
-  ['Mosaïque Retail', 'Groupe Alto', 'Spécialiste (GSS)'],
-  ['Nacre Télécom Pro', 'Granit Group', 'Opérateur télécom'],
-  ['Onyx Éducation', '', 'B2B / Intégrateur'],
-  ['Pollen Drive', 'Cobalt Achats', 'Grande distribution (GSA)'],
+  ['ALTO DISTRIBUTION', 'grossiste', 'Société par Actions Simplifiée', 'Nanterre', ['AV', 'DA', 'TE']],
+  ['BRIO ÉLECTRO', 'détaillant', 'Société Anonyme', 'Lyon', ['AV', 'DA']],
+  ['COBALT HYPERMARCHÉS', 'centrale de référencement', 'Société par Actions Simplifiée', 'Évry', ['AV', 'DA', 'TA', 'PC']],
+  ['DELTA HI-FI', 'détaillant', 'Société à Responsabilité Limitée', 'Rennes', ['AV']],
+  ['ÉCHO MULTIMÉDIA', 'détaillant', 'Société par Actions Simplifiée', 'Bordeaux', ['AV', 'MO (LCD)']],
+  ['FUSION STORE', 'entreprise de ventes évènementielles sur Internet', 'Société par Actions Simplifiée', 'Paris', ['TE', 'OC']],
+  ['GRANIT TÉLÉCOM', 'opérateur de services de communications électroniques mobiles', 'Société Anonyme', 'Paris', ['TE', 'TA', 'OC', 'AC']],
+  ['HÉLIOS MARKET', 'détaillant', 'Société Anonyme Coopérative', 'Lille', ['DA']],
+  ['IRIS ONLINE', 'détaillant', 'Société par Actions Simplifiée', 'Marseille', ['TE', 'PC']],
+  ['JADE PRO SOLUTIONS', 'intégrateur', 'Société à Responsabilité Limitée', 'Toulouse', ['MO (LFD)', 'MO (LED)', 'HO']],
+  ['KAPPA MOBILE', 'opérateur de services de communications électroniques mobiles', 'Société Anonyme', 'Nantes', ['TE', 'AC']],
+  ['LUMEN COOPÉRATIVE', 'coopérative de commerçants détaillants', 'Société Coopérative de Commerçants Détaillants', 'Rungis', ['AV', 'DA', 'TE']],
+  ['MISTRAL ÉLECTROMÉNAGER', 'grossiste', 'Société par Actions Simplifiée', 'Grenoble', ['DA']],
+  ['NOVA MARKETPLACE', 'détaillant', 'Société par Actions Simplifiée', 'Paris', ['AV', 'TE', 'TA', 'PC', 'DS']],
+  ['OPALE CUISINES', 'cuisiniste', 'Société par Actions Simplifiée', 'Angers', ['DA']],
+  ['PRISME INFORMATIQUE', 'intégrateur', 'Société Anonyme', 'Montpellier', ['PC', 'MO (LCD)', 'DS']],
+  ['QUARTZ DISTRIBUTION', 'grossiste', 'Société par Actions Simplifiée', 'Strasbourg', ['TE', 'TA', 'AC']],
+  ['RUBIS HYPER', 'centrale d\'achat', 'Société Anonyme', 'Massy', ['AV', 'DA']],
+  ['SAPHIR CONNECT', 'distributeur', 'Société à Responsabilité Limitée', 'Nice', ['OC', 'AC']],
+  ['TOPAZE ÉLECTRO', 'détaillant', 'Société par Actions Simplifiée', 'Dijon', ['AV', 'DA']],
+  ['ULTRA BUREAU', 'intégrateur', 'Société par Actions Simplifiée', 'Clermont-Ferrand', ['PC', 'MO (LCD)']],
+  ['VEGA RETAIL', 'détaillant', 'Société par Actions Simplifiée', 'Reims', ['AV']],
+  ['WAPITI MAISON', 'cuisiniste', 'Société à Responsabilité Limitée', 'Tours', ['DA']],
+  ['XÉNON GAMING', 'détaillant', 'Société par Actions Simplifiée', 'Lyon', ['MO (LCD)', 'DS']],
+  ['YUZU STORE', 'détaillant', 'Société par Actions Simplifiée', 'Caen', ['TE']],
+  ['ZÉNITH HÔTELLERIE', 'distributeur', 'Société par Actions Simplifiée', 'Cannes', ['HO']],
+  ['ARCADE NUMÉRIQUE', 'détaillant', 'Société Anonyme', 'Metz', ['AV', 'TE']],
+  ['BORÉAL MÉDICAL', 'distributeur de dispositifs médicaux', 'Société par Actions Simplifiée', 'Limoges', ['HME']],
+  ['CÈDRE SANTÉ', 'distributeur d\'appareils médicaux', 'Société par Actions Simplifiée', 'Poitiers', ['HME']],
+  ['DUNE ACCESSOIRES', 'grossiste', 'Société à Responsabilité Limitée', 'Perpignan', ['AC', 'OC']],
 ];
+const KAMS = ['Paul Durand', 'Inès Lefèvre', 'Marc Garnier', 'Nadia Faure', 'Yanis Chevalier', 'Chloé Robin', 'Victor Lambert', 'Emma Fontaine'];
 
-const KAMS = ['Sophie Lefèvre', 'Marc Dupuis', 'Inès Roche', 'Thomas Girard', 'Nadia Benali', 'Hugo Perrin', 'Léa Fontaine'];
-
-const ACTIONS = {
-  'À lancer': ['Préparer et envoyer les CGV 2027', 'Valider la trame de convention avec le KAM', 'Confirmer les interlocuteurs côté client'],
-  'CGV envoyées': ['Relancer pour accusé de réception des CGV', 'Obtenir les commentaires du client sur les CGV', 'Planifier le premier rendez-vous de négociation'],
-  'Négociation en cours': ['Envoyer la contre-proposition sur les services', 'Analyser la demande de remise de fin d’année', 'Point de négociation avec l’acheteur', 'Chiffrer la coopération commerciale demandée'],
-  'Revue juridique': ['Finaliser la revue des clauses de pénalités', 'Valider la clause de réserve de propriété', 'Retour juridique sur la version client'],
-  'Validation interne': ['Obtenir la validation Finance', 'Faire approuver par la Direction commerciale'],
-  'En signature': ['Relancer la signature côté client', 'Envoyer la version finale en signature électronique'],
-  'Bloqué / Escalade': ['Organiser une réunion d’escalade', 'Préparer la note d’escalade pour la Direction'],
-};
-
-const BLOCAGES = [
-  'Demande de pénalités logistiques jugées disproportionnées',
-  'Remise de fin d’année sans contrepartie identifiée',
-  'Désaccord sur la rémunération des services de coopération commerciale',
-  'Clause de préavis de rupture contestée',
-];
-
-const COMMENTS = [
-  'Client satisfait des conditions 2026, négociation attendue sans difficulté.',
-  'Nouvel acheteur depuis septembre : prévoir un rendez-vous de présentation.',
-  'Demande d’intégrer un plan d’affaires trimestriel.',
-  'Le client souhaite signer électroniquement.',
-  '',
-  '',
-];
-
-const DEMO_TEAM = [
-  { id: 'cm1', name: 'Camille Laurent', email: 'camille.laurent@exemple.fr', initials: 'CL', color: '#1428a0', role: 'Contract Manager' },
-  { id: 'cm2', name: 'Julien Moreau', email: 'julien.moreau@exemple.fr', initials: 'JM', color: '#eb6834', role: 'Contract Manager' },
-];
-
-function mulberry32(seed) {
+/** Générateur pseudo-aléatoire déterministe (la démonstration est identique à chaque chargement). */
+function rng(seed) {
   let a = seed >>> 0;
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-// Répartition des statuts à trois moments de la saison (début, milieu, fin).
-const ANCHORS = [
-  [0.30, 0.30, 0.17, 0.07, 0.04, 0.02, 0.04, 0.05, 0.01],
-  [0.03, 0.10, 0.28, 0.15, 0.10, 0.10, 0.17, 0.05, 0.02],
-  [0.00, 0.00, 0.03, 0.03, 0.03, 0.06, 0.80, 0.03, 0.02],
-];
+// Statut REPORT GEN (index 0-9) → statut REPORT PAR DIV correspondant (index 0-14).
+const GEN_TO_DIV = [[0], [1], [3], [2, 4, 5, 6], [7], [8], [9], [10, 11, 12], [13], [14]];
+// Répartition de démonstration des statuts (index REPORT GEN), une valeur par ligne active.
+const PLAN = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 9, 9];
 
-function weightsAt(phase) {
-  const p = clamp(phase, 0, 1);
-  const [a, b, t] = p < 0.5 ? [ANCHORS[0], ANCHORS[1], p / 0.5] : [ANCHORS[1], ANCHORS[2], (p - 0.5) / 0.5];
-  return a.map((x, i) => x + (b[i] - x) * t);
-}
-
-/** Construit l'équipe, les contrats, l'historique et les commentaires de démonstration. */
 export function buildDemo(settings, today = todayISO()) {
-  const rnd = mulberry32(2027);
-  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
-  const between = (a, b) => (b <= a ? a : addDays(a, Math.floor(rnd() * (diffDays(a, b) + 1))));
-  const statuses = listOptions(settings, 'statut').map((o) => o.value);
-  const divisions = listOptions(settings, 'division').map((o) => o.value);
-  const types = listOptions(settings, 'typeContrat').map((o) => o.value);
-  const prio = listOptions(settings, 'priorite').map((o) => o.value);
-  const kickoff = (settings.milestones || []).map((m) => m.date).filter(Boolean).sort()[0] || addDays(today, -30);
-  const sig = milestoneByRole(settings, 'signature')?.date || addDays(kickoff, 150);
-  const cgvDeadline = milestoneByRole(settings, 'cgv')?.date || addDays(kickoff, 60);
-  const phase = diffDays(kickoff, today) / Math.max(1, diffDays(kickoff, sig));
-  const weights = weightsAt(phase);
-  const yesterday = addDays(today, -1);
-  const cap = (d) => (d > yesterday ? yesterday : d);
-
-  // Tirage déterministe des statuts selon la phase de la saison.
-  const n = CLIENTS.length;
-  const counts = weights.map((w) => Math.floor(w * n));
-  let rest = n - counts.reduce((a, b) => a + b, 0);
-  for (let i = 0; rest > 0; i = (i + 1) % counts.length) { if (weights[i] > 0.05) { counts[i]++; rest--; } }
-  const statusPool = [];
-  counts.forEach((c, i) => { for (let k = 0; k < c; k++) statusPool.push(statuses[i] || statuses[0]); });
-  for (let i = statusPool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [statusPool[i], statusPool[j]] = [statusPool[j], statusPool[i]]; }
-
-  const caValues = CLIENTS.map(() => Math.round(Math.exp(5.3 + rnd() * 4.6) / 10) * 10);
-  const sortedCa = [...caValues].sort((a, b) => b - a);
-  const p1 = sortedCa[Math.floor(n * 0.2)];
-  const p2 = sortedCa[Math.floor(n * 0.5)];
-
+  const rand = rng(2027);
+  const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+  const between = (a, b) => a + Math.floor(rand() * (b - a + 1));
+  const year = Number(settings.season?.year || 2027);
+  const gen = listOptions(settings, 'statut').map((o) => o.value);
+  const div = listOptions(settings, 'reportDiv').map((o) => o.value);
+  const statutCompte = Object.fromEntries(listOptions(settings, 'statutCompte').map((o) => [o.role, o.value]));
   const contracts = [];
-  const history = [];
-  const comments = [];
-  const now = Date.now();
-  const ts = (iso, h = 10) => Math.min(now - 60000, Date.parse(`${iso}T${String(h).padStart(2, '0')}:${String(Math.floor(rnd() * 59)).padStart(2, '0')}:00`));
+  let ref = 0;
+  let planIdx = 0;
+  const lines = CLIENTS.flatMap(([client, activite, forme, ville, divisions], ci) => divisions.map((d, di) => ({ client, activite, forme, ville, division: d, ci, di })));
+  lines.forEach((l, i) => {
+    ref++;
+    const multi = CLIENTS[l.ci][4].length > 1;
+    const v = {
+      ref: String(ref), client: l.client, division: l.division,
+      kam: pick(KAMS), divLeader: l.di === 0 ? 'X' : (rand() < 0.2 ? 'ALL' : null),
+      cm: l.ci % 2 === 0 ? 'camille' : 'julien',
+      juriste: JURISTES[l.ci % JURISTES.length],
+      attribution2026: rand() < 0.5 ? 'CM' : 'JURISTE',
+      typeContrat: pick(['SEF', 'SEF', 'SEF Négocié', 'Client']),
+      signaturePafSef: rand() < 0.8 ? 'OUI' : 'NON',
+      multiDivisions: multi,
+      periode: rand() < 0.88 ? '01/01 - 31/12' : '01/03 - 28/02',
+      annexeGag: rand() < 0.7,
+      gag2026: rand() < 0.7 ? Math.round((0.04 + rand() * 0.18) * 1000) / 1000 : null,
+      rsfOnly: rand() < 0.2,
+      documentation: pick(['Contrat Cadre SEF\nPAF SEF\nAnnexe GàG', 'PAF SEF\nAnnexe GàG', 'PAF SEF', 'Contrat Cadre SEF négocié\nPAF SEF']),
+      signataire: `${pick(['Mme', 'M.'])} ${pick(['Claire', 'Antoine', 'Julie', 'Nicolas', 'Sarah', 'Olivier'])} ${pick(['DUBOIS', 'MERCIER', 'BLANC', 'GIRARD', 'BONNET', 'ROUSSEL'])}\n${pick(['Directeur des achats', 'Président', 'Directrice commerciale'])}`,
+      esig2026: rand() < 0.8 ? 'SEF' : 'CLIENT',
+      activite: l.activite,
+      codeGerp: String(2000000 + l.ci * 731 + l.di),
+      top30: l.ci < 14,
+      independant: rand() < 0.1,
+      centraleRef: l.activite === 'centrale de référencement' || l.activite.startsWith('coopérative'),
+      formeSociale: l.forme,
+      capital: [10000, 37000, 150000, 1000000, 2500000][l.ci % 5],
+      villeRcs: l.ville,
+      rcs: String(300000000 + l.ci * 1234567).slice(0, 9),
+      siege: `${between(1, 120)} ${pick(['rue de la République', 'avenue des Champs', 'boulevard Industriel', 'rue du Commerce', 'allée des Lilas'])}`,
+      codePostal: String(10000 + l.ci * 2731).slice(0, 5),
+      ville: l.ville,
+      // Historique N-1 : saison précédente, signée entre janvier et début mars.
+      n1Identifiant: `SEF${String(year - 2).slice(2)}12${String(between(1, 28)).padStart(2, '0')}_${String(i + 1).padStart(4, '0')}`,
+      n1Objet: multi && l.di === 0 ? 'Contrat cadre' : 'PAF',
+      n1ReportGen: gen[9] || null,
+      n1ReportDiv: div[14] || null,
+      n1Iso: pick(['OUI', 'NON']),
+      n1Attribution: rand() < 0.5 ? 'CM' : 'JURISTE',
+    };
+    const n1Rec = `${year - 2}-12-${String(between(10, 30)).padStart(2, '0')}`;
+    const n1Sig = addDays(`${year - 1}-01-15`, between(0, 44));
+    Object.assign(v, {
+      n1ReceptionCc: n1Rec, n1RevueTerminee: addDays(n1Rec, between(5, 20)), n1ApprovalLancee: addDays(n1Rec, between(20, 25)),
+      n1ApprovalTerminee: addDays(n1Rec, between(26, 32)), n1MiseEnSignature: addDays(n1Sig, -between(2, 8)),
+      n1SignatureClient: n1Sig, n1SignatureSef: addDays(n1Sig, between(0, 3)),
+      n1SuiviCm: `Requête ${v.n1Objet === 'PAF' ? 'portant le PAF' : 'portant le contrat cadre'} - documents reçus le ${n1Rec.slice(8)}/${n1Rec.slice(5, 7)} - signé le ${n1Sig.slice(8)}/${n1Sig.slice(5, 7)}`,
+    });
 
-  CLIENTS.forEach(([client, groupe, canal], i) => {
-    const statut = statusPool[i] || statuses[0];
-    const sIdx = statuses.indexOf(statut);
-    const cm = i === 7 ? '' : DEMO_TEAM[i % 2].id;
-    const ca = caValues[i];
-    const nDiv = canal === 'Opérateur télécom' ? 1 : 1 + Math.floor(rnd() * 3);
-    const division = canal === 'Opérateur télécom' ? [divisions[0]] : [...new Set(Array.from({ length: nDiv }, () => pick(divisions)))];
-    const values = {
-      ref: `${settings.season.refPrefix}-${String(i + 1).padStart(3, '0')}`,
-      client, groupe, canal, division,
-      typeContrat: rnd() < 0.6 ? types[0] : pick(types.slice(1, 5)),
-      cm,
-      kam: pick(KAMS),
-      priorite: ca >= p1 ? prio[0] : ca >= p2 ? prio[1] : prio[2],
-      ca,
-      statut,
-      commentaires: pick(COMMENTS),
-    };
-    const reached = (name) => sIdx >= statuses.indexOf(name) && statut !== 'Abandonné';
-    const late = statut === 'Bloqué / Escalade' || statut === 'Signé';
-    if (reached('CGV envoyées') || late) values.dateCgv = cap(between(addDays(kickoff, 2), cap(addDays(cgvDeadline, -5))));
-    if ((reached('Négociation en cours') || late) && values.dateCgv) values.dateRetourCgv = cap(between(addDays(values.dateCgv, 2), addDays(values.dateCgv, 14)));
-    if ((reached('Négociation en cours') || late) && values.dateCgv) values.version = `V${1 + Math.floor(rnd() * 4)}`;
-    if ((reached('Revue juridique') || statut === 'Signé') && values.dateRetourCgv) values.dateVersion = cap(between(values.dateRetourCgv, yesterday));
-    if (reached('Revue juridique') || statut === 'Signé') values.refSelms = `SELMS-27-${String(140 + i * 7).padStart(4, '0')}`;
-    if (statut === 'Signé') {
-      const from = values.dateVersion || values.dateRetourCgv || values.dateCgv || kickoff;
-      values.dateSignature = cap(between(addDays(from, 1), yesterday));
-      values.version = values.version || 'V2';
+    // Comptes fermés et à l'étude (hors suivi de la saison).
+    if (i % 23 === 7) { contracts.push(row({ ...v, statutCompte: statutCompte.ferme, anneeFermeture: year - 1 })); return; }
+    if (i % 29 === 11) { contracts.push(row({ ...v, statutCompte: statutCompte.etude, gag2026: null })); return; }
+    const g = PLAN[planIdx++ % PLAN.length];
+    v.statutCompte = i % 31 === 3 ? statutCompte.nouveau : statutCompte.actif;
+    v.statut = gen[g];
+    v.reportDiv = div[GEN_TO_DIV[g][Math.floor(rand() * GEN_TO_DIV[g].length)]];
+    v.attribution2027 = g >= 1 || rand() < 0.6 ? (rand() < 0.5 ? 'CM' : 'JURISTE') : null;
+    v.objet = v.n1Objet;
+    v.iso = g >= 2 ? pick(['OUI', 'OUI', 'NON']) : null;
+    v.esig2027 = g >= 7 ? v.esig2026 : null;
+    v.gag2027 = g >= 4 && v.gag2026 ? Math.round((v.gag2026 + (rand() - 0.5) * 0.04) * 1000) / 1000 : null;
+    if (g >= 1) v.selms = `SEF${today.slice(2, 4)}${today.slice(5, 7)}${String(between(1, 28)).padStart(2, '0')}_${String(i + 1).padStart(4, '0')}`;
+    // Jalons : plus le statut est avancé, plus la réception des CC est ancienne.
+    if (g >= 2) {
+      const rec = addDays(today, -between(8 + g * 3, 14 + g * 5));
+      v.receptionCc = rec;
+      if (g >= 3) v.revueAttribuee = addDays(rec, between(1, 4));
+      if (g >= 4) v.revueTerminee = addDays(rec, between(5, 9));
+      if (g >= 5) v.approvalLancee = addDays(v.revueTerminee, between(0, 2));
+      if (g >= 6) v.approvalTerminee = addDays(v.approvalLancee, between(2, 6));
+      if (g >= 7) v.miseEnSignature = addDays(v.approvalTerminee, between(0, 3));
+      if (g >= 8) { v.signatureClient = addDays(v.miseEnSignature, between(1, 4)); v.signatureSef = addDays(v.signatureClient, between(0, 2)); }
+      for (const k of ['revueAttribuee', 'revueTerminee', 'approvalLancee', 'approvalTerminee', 'miseEnSignature', 'signatureClient', 'signatureSef']) if (v[k] && v[k] > today) v[k] = today;
     }
-    if (statut === 'Bloqué / Escalade') values.blocage = pick(BLOCAGES);
-    if (ACTIONS[statut]) {
-      values.prochaineAction = pick(ACTIONS[statut]);
-      values.echeance = addDays(today, Math.floor(rnd() * 34) - 9);
+    // Dernier changement de statut : quelques comptes restés longtemps au même stade (à surveiller, bloqués).
+    const last = [v.receptionCc, v.revueAttribuee, v.revueTerminee, v.approvalLancee, v.approvalTerminee, v.miseEnSignature, v.signatureClient, v.signatureSef].filter(Boolean).sort().pop();
+    v.statutModifieLe = g >= 8 ? last : addDays(today, -(i % 9 === 0 ? between(21, 30) : i % 7 === 0 ? between(11, 18) : between(1, 8)));
+    if (last && v.statutModifieLe < last && g < 8) v.statutModifieLe = last;
+    if (g < 8) {
+      v.suiviCm = g === 0 ? 'En attente des conditions commerciales de la division.'
+        : g === 1 ? 'Contrat client demandé au KAM, envoi annoncé pour la fin du mois.'
+          : g <= 3 ? `Revue en cours${v.juriste ? ` avec ${v.juriste}` : ''} : points ouverts sur les pénalités logistiques.`
+            : g <= 5 ? 'Revue terminée, approval lancé dans SELMS.'
+              : 'Documents envoyés en signature électronique.';
+    } else {
+      v.suiviCm = `Signé le ${v.signatureClient?.slice(8)}/${v.signatureClient?.slice(5, 7)}${g === 9 ? ', clôturé dans SELMS' : ''}.`;
     }
-    if (rnd() < 0.35) values.lienDossier = `https://intranet.exemple.fr/juridique/saison-2027/${values.ref}`;
-    const created = ts(kickoff, 9);
-    const author = DEMO_TEAM[i % 2];
-    const updatedDay = [values.dateSignature, values.dateVersion, values.dateRetourCgv, values.dateCgv].filter(Boolean).sort().pop() || kickoff;
-    const contract = {
-      id: uid(), values,
-      createdAt: created, createdBy: author.id, createdByName: author.name,
-      updatedAt: ts(updatedDay, 11 + Math.floor(rnd() * 6)), updatedBy: author.id, updatedByName: author.name,
-    };
-    contracts.push(contract);
-    history.push({ id: uid(), ts: created, uid: author.id, user: author.name, action: 'create', contractId: contract.id, contractRef: values.ref, contractLabel: client });
-    if (values.dateCgv) history.push({ id: uid(), ts: ts(values.dateCgv, 10), uid: author.id, user: author.name, action: 'update', contractId: contract.id, contractRef: values.ref, contractLabel: client, field: 'statut', fieldLabel: 'Statut', from: 'À lancer', to: 'CGV envoyées' });
-    if (statut !== 'CGV envoyées' && statut !== 'À lancer' && values.dateCgv) history.push({ id: uid(), ts: contract.updatedAt, uid: author.id, user: author.name, action: 'update', contractId: contract.id, contractRef: values.ref, contractLabel: client, field: 'statut', fieldLabel: 'Statut', from: 'CGV envoyées', to: statut });
-    if (values.echeance && rnd() < 0.5) history.push({ id: uid(), ts: Math.min(now - 120000, contract.updatedAt + 3600000), uid: author.id, user: author.name, action: 'update', contractId: contract.id, contractRef: values.ref, contractLabel: client, field: 'prochaineAction', fieldLabel: 'Prochaine action', from: '', to: values.prochaineAction });
-    if (rnd() < 0.18) {
-      const other = DEMO_TEAM[(i + 1) % 2];
-      comments.push({ id: uid(), contractId: contract.id, text: pick(['Le KAM confirme un rendez-vous la semaine prochaine.', 'Attention : le client veut revoir la clause de pénalités.', 'Version envoyée, en attente de retour.', 'Peux-tu reprendre ce dossier pendant mes congés ?']), uid: other.id, user: other.name, ts: Math.min(now - 300000, contract.updatedAt + 7200000) });
-    }
+    contracts.push(row(v));
   });
+  // Une anomalie de saisie, pour illustrer le contrôle des jalons.
+  const odd = contracts.find((c) => c.values.statut === gen[5] && c.values.revueTerminee);
+  if (odd) odd.values.revueTerminee = addDays(odd.values.receptionCc, -2);
 
+  // Quelques entrées de journal et commentaires fictifs, pour illustrer le travail à plusieurs.
+  const comments = [];
+  const history = [];
+  const at = (iso, h, m) => Date.parse(`${iso}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
+  const label = (c) => `${c.values.client} (${c.values.division})`;
+  const who = (c) => DEMO_TEAM.find((t) => t.id === c.values.cm) || DEMO_TEAM[0];
+  const moved = contracts.filter((c) => c.values.statutModifieLe && c.values.statutModifieLe < today && c.values.statut !== gen[0]).slice(0, 14);
+  moved.forEach((c, i) => {
+    const t = who(c);
+    const prev = div[Math.max(0, div.indexOf(c.values.reportDiv) - 1)];
+    history.push({ id: `demoh${i}`, ts: at(c.values.statutModifieLe, 9 + (i % 8), (i * 7) % 60), uid: `demo:${t.id}`, user: t.name, contractId: c.id, contractRef: c.values.ref, contractLabel: label(c), action: 'update', field: 'reportDiv', fieldLabel: 'REPORT PAR DIV', from: prev, to: c.values.reportDiv });
+  });
+  contracts.filter((c) => c.values.suiviCm && c.values.statutModifieLe && c.values.statutModifieLe < today).slice(2, 6).forEach((c, i) => {
+    const t = DEMO_TEAM[(i + 1) % 2];
+    const text = ['Le KAM confirme l’envoi des conditions commerciales cette semaine.', 'Point juridique fait avec le juriste : les clauses de pénalités sont acceptables.', 'Attention : signataire absent jusqu’à la fin du mois.', 'Version signée reçue par e-mail, à déposer dans SELMS.'][i];
+    const ts = at(addDays(today, -(i + 1)), 14 + i, 10);
+    comments.push({ id: `democ${i}`, contractId: c.id, text, uid: `demo:${t.id}`, user: t.name, ts });
+    history.push({ id: `demohc${i}`, ts, uid: `demo:${t.id}`, user: t.name, contractId: c.id, contractRef: c.values.ref, contractLabel: label(c), action: 'comment', to: text });
+  });
   history.sort((a, b) => b.ts - a.ts);
-  return { team: DEMO_TEAM, contracts, history, comments, counter: contracts.length };
+  const settingsPatch = {
+    homeNotes: `Saison ${year} — démonstration\n${today.split('-').reverse().join('/')} : données fictives chargées pour découvrir l’outil.`,
+    homeVigilance: 'GRANIT TÉLÉCOM TE & TA : mêmes conditions dans les deux PAF (contrat commun).\nLUMEN COOPÉRATIVE : les PAF SEF doivent être signés par les deux parties.\nNOVA MARKETPLACE : requête à compléter avec l’annexe GàG.',
+    lists: { juriste: JURISTES.map((v, i) => ({ value: v, color: ['#7030a0', '#6250d6', '#e87ba4', '#2a78d6'][i % 4] })) },
+  };
+  return { team: DEMO_TEAM, contracts, history, comments, counter: contracts.length, settingsPatch };
+
+  function row(values) {
+    const clean = {};
+    for (const [k, x] of Object.entries(values)) if (x !== null && x !== undefined && x !== '' && x !== false) clean[k] = x;
+    const by = DEMO_TEAM.find((t) => t.id === clean.cm) || DEMO_TEAM[0];
+    const at = Date.parse(`${clean.statutModifieLe || today}T${String(9 + (contracts.length % 9)).padStart(2, '0')}:${String((contracts.length * 7) % 60).padStart(2, '0')}:00`);
+    return { id: `demo${String(contracts.length + 1).padStart(3, '0')}`, values: clean, updatedAt: at, updatedByName: by.name, createdAt: at, createdByName: by.name };
+  }
 }

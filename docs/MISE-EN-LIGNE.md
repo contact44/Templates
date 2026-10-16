@@ -1,205 +1,141 @@
-# Mise en ligne et configuration
+# Mise en ligne
 
-Ce guide décrit, étape par étape, comment publier l'outil sur GitHub Pages puis le relier à une base
-Firebase pour que plusieurs personnes modifient les mêmes données **en même temps**. Comptez environ
-30 minutes la première fois. Aucune compétence de développement n'est nécessaire.
+Ce guide met l'outil en ligne pour l'équipe Contract Management, en **une trentaine de minutes**, sans
+installer de logiciel. Il suffit d'un compte GitHub (celui qui administrera l'outil).
 
-> **Sans Firebase**, l'application fonctionne déjà en ligne, mais en **mode local** : chaque personne
-> voit ses propres données, enregistrées dans son navigateur. Le partage en temps réel exige l'étape 2.
+## Principe
 
----
+L'outil utilise **deux dépôts GitHub** :
 
-## 1. Publier le site sur GitHub Pages
-
-Le site publié est le dossier `site/` du dépôt. Le fichier `.github/workflows/pages.yml` le publie
-automatiquement à chaque mise à jour de la branche `main`.
-
-1. Sur GitHub, ouvrez le dépôt **contact44/Templates**.
-2. Fusionnez la branche de travail `claude/great-planck-644319` dans `main`
-   (onglet **Pull requests › New pull request**, base `main` ← compare `claude/great-planck-644319`,
-   puis **Merge**).
-3. **Settings › Pages › Build and deployment › Source** : choisissez **GitHub Actions**
-   (déjà le cas si l'ancien projet était publié par ce biais).
-4. Onglet **Actions** : attendez que le workflow « Publication GitHub Pages » soit vert (1 à 2 minutes).
-5. Le site est disponible à l'adresse **https://contact44.github.io/Templates/**.
-
-> Le code du site est public (comme tout site GitHub Pages gratuit), mais il **ne contient aucune donnée** :
-> les contrats sont stockés dans Firebase, derrière une connexion et des règles d'accès.
-
----
-
-## 2. Créer la base partagée Firebase (gratuite)
-
-### 2.1 Créer le projet
-
-1. Allez sur **https://console.firebase.google.com** avec un compte Google (idéalement un compte
-   dédié à l'équipe juridique plutôt qu'un compte personnel).
-2. **Créer un projet** (« Add project ») : nom `saison-contractuelle` par exemple. Google Analytics :
-   inutile, vous pouvez le désactiver.
-
-### 2.2 Activer la connexion par e-mail
-
-1. Menu **Build › Authentication** (« Créer » › « Authentication ») › **Commencer**.
-2. Onglet **Sign-in method / Mode de connexion** › **E-mail/Mot de passe** › activez la première option ›
-   **Enregistrer**.
-3. Onglet **Users / Utilisateurs** › **Ajouter un utilisateur** : créez un compte pour vous et pour
-   chacun des deux contract managers (adresse e-mail + mot de passe provisoire d'au moins 8 caractères).
-   Chacun pourra ensuite changer son mot de passe depuis l'application (menu de l'avatar, en haut à droite).
-4. Onglet **Settings / Paramètres › Authorized domains / Domaines autorisés** › **Ajouter un domaine** :
-   `contact44.github.io`.
-5. Facultatif mais recommandé : **Settings › User actions** › décochez **Enable create (sign-up)** si
-   l'option est proposée, pour que personne ne puisse se créer de compte lui-même. (Même sans cela, les
-   règles de l'étape 2.4 bloquent toute personne absente de la liste.)
-
-### 2.3 Créer la base Firestore
-
-1. Menu **Build › Firestore Database** › **Créer une base de données**.
-2. Emplacement : choisissez une région européenne, par exemple **europe-west9 (Paris)** ou **eur3 (Europe)**.
-   Ce choix est définitif.
-3. Démarrez en **mode production** (les règles de l'étape suivante ouvriront l'accès à votre équipe).
-
-### 2.4 Publier les règles de sécurité
-
-1. Ouvrez le fichier `firebase/firestore.rules` du dépôt.
-2. Remplacez les trois adresses de la liste `ALLOWED_EMAILS` par les adresses **exactes** des comptes
-   créés à l'étape 2.2 (en minuscules) :
-
-   ```
-   // ALLOWED_EMAILS — début
-   'prenom.nom@samsung.com',
-   'contract.manager1@samsung.com',
-   'contract.manager2@samsung.com'
-   // ALLOWED_EMAILS — fin
-   ```
-
-3. Dans la console : **Firestore Database › Règles** › effacez le contenu › collez le fichier modifié ›
-   **Publier**.
-
-Ces règles garantissent que :
-- seules les personnes listées peuvent lire ou modifier les données ;
-- le **journal des modifications ne peut être ni modifié ni effacé** (traçabilité) ;
-- chacun ne peut mettre à jour que sa propre présence (« qui est en ligne »).
-
-Pour ajouter ou retirer une personne plus tard : créez/supprimez son compte (étape 2.2) et mettez la liste
-à jour (étape 2.4).
-
-### 2.5 Relier le site à Firebase
-
-1. **Paramètres du projet** (roue dentée en haut à gauche) › **Général** › **Vos applications** ›
-   icône **Web `</>`** › nom « Saison contractuelle » (pas besoin de Firebase Hosting) › **Enregistrer**.
-2. Firebase affiche un bloc `firebaseConfig`. Copiez ses valeurs dans le fichier **`site/config.js`** :
-
-   ```js
-   window.APP_CONFIG = {
-     firebase: {
-       apiKey: "AIzaSy…",
-       authDomain: "saison-contractuelle.firebaseapp.com",
-       projectId: "saison-contractuelle",
-       storageBucket: "saison-contractuelle.firebasestorage.app",
-       messagingSenderId: "1234567890",
-       appId: "1:1234567890:web:abc123"
-     },
-     seasonId: '2027',
-     forceLongPolling: false,
-   };
-   ```
-
-   Sur GitHub, vous pouvez modifier ce fichier directement dans le navigateur (icône crayon), puis
-   **Commit changes** sur `main`. Le site se met à jour en une à deux minutes.
-
-> Ces valeurs ne sont **pas secrètes** : Firebase les conçoit pour être visibles dans le navigateur.
-> La protection repose sur la connexion et sur les règles de l'étape 2.4.
-
----
-
-## 3. Premier démarrage
-
-1. Ouvrez **https://contact44.github.io/Templates/** et connectez-vous.
-   Le premier utilisateur connecté initialise la saison (paramètres par défaut).
-2. **Paramètres › Équipe** : renseignez les noms et **les adresses e-mail de connexion** des contract
-   managers. L'application reconnaît ainsi qui est connecté (filtre « Mes contrats », journal, présence).
-3. **Paramètres › Saison et échéances** : vérifiez les jalons (CGV au 1er décembre 2026, date butoir au
-   1er mars 2027, objectif interne…).
-4. **Paramètres › Listes de valeurs** et **Colonnes** : ajustez les statuts, canaux, divisions, types de
-   contrat et colonnes pour qu'ils correspondent exactement à votre fichier Excel.
-5. **Importez votre fichier** : bouton **Importer** du suivi (ou Paramètres › Import, export et sauvegarde).
-
-### Importer le fichier Excel protégé par le DRM Samsung
-
-Le fichier `0. Fichier_Suivi_Saison_Contractuelle_2027.xlsm` est chiffré par le DRM Samsung (NASCA) :
-seul Excel, sur un poste Samsung, peut l'ouvrir. Le navigateur ne peut donc pas le lire directement.
-Deux solutions :
-
-- **Copier-coller (recommandé)** : ouvrez le fichier dans Excel, sélectionnez le tableau **avec sa ligne
-  d'en-tête**, copiez (Ctrl+C), puis dans l'application : **Importer › Coller depuis Excel**, collez
-  (Ctrl+V) et validez. Les colonnes sont reconnues automatiquement ; vous pouvez corriger la
-  correspondance avant d'importer, et créer les colonnes qui n'existent pas encore.
-- **Copie non protégée** : si votre politique de sécurité l'autorise, enregistrez une copie sans DRM
-  (.xlsx) et importez-la.
-
-Si le DRM bloque aussi le presse-papiers, faites l'import feuille par feuille ou saisissez les données
-directement dans l'outil.
-
----
-
-## 4. Points de vigilance
-
-- **Confidentialité** : les données des négociations seront hébergées par Google (Firebase), dans la
-  région choisie à l'étape 2.3. Faites valider ce choix par la sécurité informatique et, le cas échéant,
-  par le DPO avant d'y saisir des informations réelles.
-- **Réseau de l'entreprise** : l'application doit pouvoir joindre `contact44.github.io`,
-  `firestore.googleapis.com`, `identitytoolkit.googleapis.com` et `securetoken.googleapis.com`.
-  Si l'indicateur reste sur « Connexion… » ou « Hors ligne » alors qu'Internet fonctionne, passez
-  `forceLongPolling` à `true` dans `site/config.js` ; si le problème persiste, demandez l'ouverture de ces
-  adresses au support informatique.
-- **E-mails « mot de passe oublié »** : ils sont envoyés par `noreply@<projet>.firebaseapp.com` et peuvent
-  arriver dans les courriers indésirables, ou être filtrés. L'administrateur peut aussi réinitialiser un
-  mot de passe depuis la console (Authentication › Users).
-- **Coût** : le forfait gratuit (Spark) suffit largement pour trois utilisateurs et quelques centaines de
-  contrats (50 000 lectures et 20 000 écritures par jour). L'application limite volontairement ses lectures
-  (journal chargé par pages) pour rester dans ce cadre toute la saison.
-- **Sauvegardes** : téléchargez régulièrement une sauvegarde (Paramètres › Import, export et sauvegarde ›
-  Sauvegarde complète) et un export Excel, par exemple chaque vendredi.
-
----
-
-## 5. Saison suivante
-
-Pour démarrer la saison 2028 sans effacer 2027 :
-
-1. Exportez la saison 2027 (sauvegarde .json et export Excel) pour archive.
-2. **Paramètres › Import, export et sauvegarde › Préparer la saison suivante** : téléchargez le fichier de
-   départ 2028 (mêmes clients, équipe, listes et colonnes ; jalons décalés d'un an ; statuts, dates et
-   actions remis à zéro).
-3. Dans `site/config.js`, remplacez `seasonId: '2027'` par `seasonId: '2028'` et publiez.
-4. Connectez-vous, puis **Paramètres › Import, export et sauvegarde › Restaurer…** avec le fichier de départ.
-   Vérifiez les jalons (les dates légales peuvent évoluer d'une année sur l'autre).
-
-La saison 2027 reste consultable en remettant temporairement `seasonId: '2027'`.
-
----
-
-## 6. Dépannage
-
-| Symptôme | Cause probable | Solution |
+| Dépôt | Contenu | Visibilité |
 |---|---|---|
-| Bandeau « Mode local » après configuration | `site/config.js` non mis à jour sur `main`, ou cache du navigateur | Vérifier le fichier sur GitHub, recharger avec Ctrl+F5 |
-| « Accès non autorisé » après connexion | Adresse absente des règles Firestore | Étape 2.4 (adresse exacte, en minuscules) |
-| Erreur de connexion « domaine non autorisé » | `contact44.github.io` absent des domaines autorisés | Étape 2.2, point 4 |
-| Indicateur « Hors ligne » permanent | Proxy ou pare-feu de l'entreprise | `forceLongPolling: true`, puis support informatique |
-| Les collègues ne voient pas mes modifications | L'un des deux est en mode local ou hors ligne | Vérifier l'indicateur en haut à droite et la mention « Base partagée » |
+| **Site** (ex. `suivi-cm`) | l'application (pages, styles, scripts) publiée par GitHub Pages | public (aucune donnée dedans) |
+| **Données** (`suivi-cm-donnees`) | un fichier JSON par ligne du suivi, les paramètres, les commentaires | **PRIVÉ** |
 
----
+Chaque modification faite dans l'outil est enregistrée immédiatement dans le dépôt de données (un
+« commit » GitHub). Les autres postes lisent ce dépôt toutes les 5 secondes : les modifications de chacun
+apparaissent chez les autres sans recharger la page. Si deux personnes modifient la même ligne en même
+temps, les deux saisies sont fusionnées champ par champ. Hors connexion, les modifications sont gardées sur
+le poste et envoyées au retour du réseau.
 
-## 7. Pour aller plus loin (facultatif)
+> **Confidentialité.** Le dépôt de données doit rester **privé** : il contient les noms des clients, les
+> signataires et les conditions commerciales. Un dépôt GitHub Pages gratuit est public : n'y placez jamais de
+> données. L'outil affiche un bandeau rouge s'il détecte que le dépôt de données est public.
 
-Les tests automatiques se lancent depuis un poste disposant de Node.js 22 :
+## 1. Créer le dépôt de données (privé)
 
-```bash
-npm install
-npm run test:unit      # calculs, dates, import Excel, automatisations
-npm run test:e2e       # parcours complet dans un navigateur (mode local)
-npm run test:sync      # deux utilisateurs simultanés sur l'émulateur Firebase (Java 21 requis)
+1. Connectez-vous sur **github.com** puis ouvrez **https://github.com/new**.
+2. *Owner* : votre compte (ex. `contact44`) ; *Repository name* : `suivi-cm-donnees`.
+3. Cochez **Private**. Ne cochez rien d'autre (pas de README) : l'outil prépare le dépôt lui-même.
+4. Cliquez sur **Create repository**.
+
+## 2. Créer la clé d'accès
+
+L'outil écrit dans le dépôt de données avec une **clé d'accès GitHub** (« fine-grained personal access
+token ») limitée à ce seul dépôt.
+
+1. Ouvrez **https://github.com/settings/personal-access-tokens/new**.
+2. *Token name* : `Suivi CM` ; *Expiration* : la durée la plus longue proposée (notez la date de
+   renouvellement dans votre agenda).
+3. *Resource owner* : votre compte ; *Repository access* : **Only select repositories** › `suivi-cm-donnees`.
+4. *Permissions* › *Repository permissions* › **Contents : Read and write** (les « Metadata : Read-only »
+   s'ajoutent automatiquement). Aucune autre permission n'est nécessaire.
+5. **Generate token**, puis copiez la clé (`github_pat_…`) : elle ne s'affiche qu'une fois.
+
+**Pour l'équipe**, deux possibilités :
+
+- **Simple (recommandée pour 2 ou 3 personnes)** : une seule clé, partagée par un **lien d'accès** (étape 6).
+  Chacun indique son nom au premier accès (« Qui suis-je ? ») : le journal de l'outil et le filtre « Mes
+  comptes » s'appuient sur ce choix.
+- **Une clé par personne** : créez une **organisation GitHub** gratuite (https://github.com/organizations/new),
+  transférez-y le dépôt de données, invitez les contract managers ; chacun crée sa propre clé avec
+  *Resource owner* = l'organisation. Chaque modification est alors signée de son auteur dans GitHub.
+
+## 3. Publier le site
+
+1. Créez un second dépôt sur **https://github.com/new** : nom `suivi-cm`, **Public**, cochez
+   *Add a README file*, puis **Create repository**.
+2. Décompressez l'archive livrée. Dans le dépôt `suivi-cm`, cliquez sur **Add file › Upload files** et
+   glissez **le contenu du dossier `site/`** (les fichiers `index.html`, `config.js`, `favicon.svg`,
+   `manifest.webmanifest` et les dossiers `assets/` et `vendor/`), puis **Commit changes**.
+3. **Settings › Pages** : *Source* = **Deploy from a branch**, *Branch* = `main`, dossier `/ (root)`,
+   **Save**.
+4. Après une à deux minutes, l'adresse du site s'affiche en haut de la page *Pages*
+   (ex. `https://contact44.github.io/suivi-cm/`).
+
+> Variante pour une équipe technique : déposer l'archive complète et choisir *Source* = **GitHub Actions** ;
+> le fichier `.github/workflows/pages.yml` lance les tests unitaires puis publie le dossier `site/`.
+
+## 4. Indiquer le dépôt de données
+
+Dans le dépôt `suivi-cm`, ouvrez `config.js`, cliquez sur le crayon (*Edit*) et vérifiez :
+
+```js
+github: {
+  owner: 'contact44',          // votre compte (ou l'organisation)
+  repo: 'suivi-cm-donnees',    // le dépôt PRIVÉ créé à l'étape 1
+  ...
+},
+seasonId: '2027',
 ```
 
-Les dépendances embarquées (`site/vendor/`) se reconstruisent avec `npm run vendor`.
+**Commit changes** : le site est mis à jour en une minute.
+
+## 5. Premier accès et import du fichier Excel
+
+1. Ouvrez l'adresse du site, collez la clé d'accès, **Se connecter**. L'outil prépare le dépôt de données
+   (dossier `suivi-cm/2027`).
+2. Sur l'**Accueil**, cliquez sur **Importer le fichier Suivi CM** et choisissez
+   `0._Fichier_suivi_CM_2027_….xlsm`. L'onglet « 1.Suivi CM » et ses colonnes sont reconnus
+   automatiquement : les colonnes calculées (« auto ») et les séparateurs sont ignorés car l'outil les
+   recalcule ; les CM référents sont créés dans l'équipe et les juristes ajoutés à la liste.
+3. Vérifiez la correspondance proposée, puis **Importer**. Les 211 lignes du fichier actuel sont créées.
+4. **Paramètres › Équipe** : complétez l'e-mail de chaque CM ; **Paramètres › Accueil et liens** : les
+   liens vers les dossiers réseau.
+
+> Fichier protégé par le DRM Samsung (NASCA) : le navigateur ne peut pas le lire. Ouvrez-le dans Excel,
+> sélectionnez le tableau de l'onglet 1.Suivi CM (en-têtes compris), copiez, puis dans l'assistant d'import
+> choisissez **Coller depuis Excel**.
+
+## 6. Donner l'accès à l'équipe
+
+**Paramètres › Connexion et partage › Lien d'accès pour l'équipe** : collez la clé, l'outil fabrique un lien
+`…/#acces=…`. Envoyez-le à chaque contract manager par un canal privé (message direct Teams, en main
+propre ; jamais dans un e-mail collectif ni un document partagé). À l'ouverture du lien, la clé est
+enregistrée dans le navigateur puis retirée de la barre d'adresse : il suffit ensuite d'ouvrir l'adresse du
+site (ajoutez-la aux favoris).
+
+Pour retirer l'accès : **github.com › Settings › Developer settings › Personal access tokens** ›
+supprimer la clé, puis en créer une nouvelle et renvoyer un lien.
+
+## Fonctionnement au quotidien
+
+- **Temps réel** : lecture du dépôt toutes les 5 secondes (réglable : `pollMs` dans `config.js`), envoi
+  immédiat des modifications. L'indicateur en haut de l'écran signale les modifications en attente.
+- **Historique** : chaque modification est un commit du dépôt de données : rien n'est perdu, chaque version
+  reste consultable sur GitHub. L'onglet **Journal** de l'outil présente ces modifications en clair.
+- **Sauvegarde** : **Paramètres › Import, export et sauvegarde** › *Sauvegarde complète* (.json) et export
+  Excel mis en forme, à tout moment.
+- **Quota GitHub** : 5 000 requêtes par heure et par clé ; les lectures sans changement ne sont pas
+  décomptées. En cas de dépassement (rare), l'outil patiente et reprend seul, sans perte.
+- **Expiration de la clé** : l'outil affiche l'écran de connexion ; les modifications non envoyées restent
+  sur le poste. Créez une nouvelle clé (étape 2) et renvoyez le lien d'accès.
+
+## Saison suivante
+
+1. **Paramètres › Import, export et sauvegarde › Préparer la saison suivante** : téléchargez le fichier de
+   départ (comptes ouverts, statuts et dates de la saison basculés dans l'historique N-1, comptes fermés
+   retirés).
+2. Dans `config.js`, remplacez `seasonId: '2027'` par `'2028'` : l'outil démarre une saison vierge dans le
+   même dépôt (la saison 2027 reste consultable en remettant `'2027'`).
+3. **Paramètres › Import, export et sauvegarde › Restaurer…** : choisissez le fichier de départ.
+
+## Dépannage
+
+| Situation | Solution |
+|---|---|
+| « Dépôt de données introuvable » | Vérifiez `owner` / `repo` dans `config.js` et que la clé donne accès à ce dépôt. |
+| « Enregistrement refusé par GitHub » | La clé est en lecture seule : permission **Contents : Read and write**. |
+| Bandeau rouge « Dépôt public » | Dépôt de données › Settings › General › Danger Zone › *Change visibility* › Private. |
+| GitHub injoignable | Réseau ou proxy d'entreprise : `api.github.com` doit être accessible. Les modifications attendent sur le poste. |
+| Essayer sans GitHub | Remplacez `github: { … }` par `github: null` dans `config.js` : mode local (données dans le navigateur, non partagées). |

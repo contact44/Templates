@@ -244,3 +244,101 @@ export function timelineHTML(milestones, today, { width = 1000 } = {}) {
     ${inRange ? `<div class="today-pin" style="left:${tpos}%"><span>Aujourd’hui</span></div>` : ''}
   </div>`;
 }
+
+/* ---------------------------------------------- Colonnes empilées (reporting) */
+
+/**
+ * Une colonne par groupe (division), segments empilés par statut (onglet « 5.Rep Gen GRAPH »).
+ * groups : [{ key, label, counts: { seg: n }, total }] ; segments : [{ key, label, color }].
+ */
+export function columnsHTML(groups, segments, { height = 260, unit = 'contrats / PAF' } = {}) {
+  const max = Math.max(1, ...groups.map((g) => g.total));
+  const step = niceStep(max);
+  let top = Math.ceil(max / step) * step;
+  if (top - max < step / 2) top += step; // place pour le total au-dessus de la plus haute colonne
+  const ticks = [];
+  for (let v = 0; v <= top; v += step) ticks.push(v);
+  const cols = groups.map((g) => {
+    const segs = segments.map((s) => {
+      const n = g.counts[s.key] || 0;
+      if (!n) return '';
+      return `<span class="vseg" style="flex:${n} 1 0;--c:${esc(s.color)}" tabindex="0" data-tt="${tip(g.label, [{ value: `${n}`, label: s.label, color: s.color }, { value: `${Math.round((n / g.total) * 100)} %`, label: `des ${g.total} ${unit}` }])}">${n / top * height >= 16 ? `<span class="vseg-label" style="color:${inkOn(s.color)}">${n}</span>` : ''}</span>`;
+    }).join('');
+    return `<div class="vcol" role="listitem"><div class="vcol-plot" style="height:${height}px"><div class="vcol-stack" style="height:${(g.total / top) * 100}%">${segs}</div><span class="vcol-total" style="bottom:calc(${(g.total / top) * 100}% + 4px)">${g.total || ''}</span></div><span class="vcol-label">${esc(g.label)}</span></div>`;
+  }).join('');
+  return `<div class="vchart">
+    <div class="vaxis" style="height:${height}px">${ticks.map((v) => `<span style="bottom:${(v / top) * 100}%">${v}</span>`).join('')}</div>
+    <div class="vcols" role="list" style="--h:${height}px">${ticks.map((v) => `<span class="vgrid" style="bottom:calc(${(v / top) * height}px + 22px)"></span>`).join('')}${cols}</div>
+  </div>
+  <div class="legend legend-wrap">${segments.map((s) => `<span class="legend-item"><span class="legend-swatch" style="--c:${esc(s.color)}"></span>${esc(s.label)}</span>`).join('')}</div>`;
+}
+
+/* ------------------------------------------- Barre 100 % (synthèse générale) */
+
+/** parts : [{ label, value, color }] — une barre 100 % avec valeurs et légende (onglet « 3.Rep Gen SYNTHESE »). */
+export function stack100HTML(parts) {
+  const total = parts.reduce((a, p) => a + p.value, 0);
+  const segs = parts.map((p) => {
+    if (!p.value) return '';
+    const share = total ? p.value / total : 0;
+    return `<span class="seg" style="flex:${p.value} 1 0;--c:${esc(p.color)}" tabindex="0" data-tt="${tip(p.label, [{ value: `${p.value}`, label: 'contrats / PAF', color: p.color }, { value: `${Math.round(share * 100)} %`, label: 'du total' }])}"><span class="seg-label" style="color:${inkOn(p.color)}">${p.value}</span></span>`;
+  }).join('');
+  return `<div class="stack100"><span class="stack-bar">${segs || '<span class="seg empty"></span>'}</span></div>
+    <div class="legend legend-wrap">${parts.map((p) => `<span class="legend-item"><span class="legend-swatch" style="--c:${esc(p.color)}"></span>${esc(p.label)} <strong>${p.value}</strong>${total ? ` <span class="muted">(${Math.round((p.value / total) * 100)} %)</span>` : ''}</span>`).join('')}</div>`;
+}
+
+/* ------------------------------------------------------ Anneau (répartition) */
+
+/** slices : [{ label, value, color }] ; affiche un anneau et la liste des valeurs (nombre ou %). */
+export function donutHTML(slices, { size = 200, mode = 'count', center = null } = {}) {
+  const total = slices.reduce((a, s) => a + s.value, 0);
+  const r = size / 2 - 14; const cx = size / 2; const cy = size / 2; const w = 26;
+  let a0 = -Math.PI / 2;
+  const arcs = slices.filter((s) => s.value > 0).map((s) => {
+    const frac = total ? s.value / total : 0;
+    const a1 = a0 + frac * Math.PI * 2;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const gap = slices.filter((x) => x.value > 0).length > 1 ? 0.012 : 0;
+    const p = (a, rr) => `${(cx + rr * Math.cos(a)).toFixed(2)},${(cy + rr * Math.sin(a)).toFixed(2)}`;
+    const d = frac >= 0.9999
+      ? `M${cx},${cy - r}A${r},${r} 0 1 1 ${cx - 0.01},${cy - r}L${cx - 0.01},${cy - r + w}A${r - w},${r - w} 0 1 0 ${cx},${cy - r + w}Z`
+      : `M${p(a0 + gap, r)}A${r},${r} 0 ${large} 1 ${p(a1 - gap, r)}L${p(a1 - gap, r - w)}A${r - w},${r - w} 0 ${large} 0 ${p(a0 + gap, r - w)}Z`;
+    a0 = a1;
+    return `<path d="${d}" fill="${esc(s.color)}" tabindex="0" data-tt="${tip(s.label, [{ value: `${s.value}`, label: 'contrats / PAF', color: s.color }, { value: `${Math.round(frac * 100)} %`, label: 'du total' }])}"/>`;
+  }).join('');
+  const fmt = (v) => (mode === 'percent' ? `${total ? Math.round((v / total) * 100) : 0} %` : fmtNumber(v));
+  return `<div class="donut-wrap">
+    <svg class="donut" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Répartition">${arcs || `<circle cx="${cx}" cy="${cy}" r="${r - w / 2}" fill="none" stroke="var(--surface-3)" stroke-width="${w}"/>`}
+      <text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-value">${esc(center?.value ?? fmtNumber(total))}</text><text x="${cx}" y="${cy + 16}" text-anchor="middle" class="donut-label">${esc(center?.label ?? 'au total')}</text></svg>
+    <ul class="donut-legend">${slices.map((s) => `<li class="${s.value ? '' : 'is-zero'}"><span class="legend-swatch" style="--c:${esc(s.color)}"></span><span class="clip">${esc(s.label)}</span><strong>${esc(fmt(s.value))}</strong></li>`).join('')}</ul>
+  </div>`;
+}
+
+/* ------------------------------------------------- Courbes (suivi hebdo) */
+
+/**
+ * series : [{ label, color, values: [number|null], dashed }] sur des abscisses communes (labels).
+ * Les valeurs sont des parts (0 à 1) affichées en pourcentage.
+ */
+export function linesSVG(series, labels, { height = 240, width = 720 } = {}) {
+  const W = Math.max(320, width); const H = height;
+  const m = { l: 40, r: 14, t: 14, b: 30 };
+  const iw = W - m.l - m.r; const ih = H - m.t - m.b;
+  const n = Math.max(1, labels.length - 1);
+  const x = (i) => m.l + (i / n) * iw;
+  const y = (v) => m.t + ih - v * ih;
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const paths = series.map((s) => {
+    let d = ''; let pen = false;
+    s.values.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; });
+    const dots = s.values.map((v, i) => (v === null || v === undefined ? '' : `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${esc(s.color)}" tabindex="0" data-tt="${tip(labels[i], [{ value: `${Math.round(v * 100)} %`, label: s.label, color: s.color }])}"/>`)).join('');
+    return `<path d="${d}" fill="none" stroke="${esc(s.color)}" stroke-width="2.5" ${s.dashed ? 'stroke-dasharray="6 5"' : ''} stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+  }).join('');
+  const every = Math.ceil(labels.length / 8);
+  return `<div class="legend">${series.map((s) => `<span class="legend-item"><span class="legend-line${s.dashed ? ' dashed' : ''}" style="--c:${esc(s.color)}"></span>${esc(s.label)}</span>`).join('')}</div>
+    <svg class="lines" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${esc(series.map((s) => s.label).join(' et '))}">
+      <g class="grid">${ticks.map((v) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="tick" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v * 100} %</text>`).join('')}</g>
+      <g class="xaxis">${labels.map((l, i) => (i % every === 0 || i === labels.length - 1 ? `<text class="tick" x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(l)}</text>` : '')).join('')}</g>
+      ${paths}
+    </svg>`;
+}
