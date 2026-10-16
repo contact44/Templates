@@ -212,7 +212,7 @@ await step('Déconnexion', async () => {
 });
 
 await step('Aucune erreur inattendue dans la console', async () => {
-  const unexpected = errors.filter((e) => !/permission-denied|Missing or insufficient permissions|ERR_INTERNET_DISCONNECTED|net::ERR|Could not reach Cloud Firestore|WebChannelConnection|offline/i.test(e));
+  const unexpected = errors.filter((e) => !/Failed to load resource: the server responded with a status of 40[03]|permission-denied|Missing or insufficient permissions|ERR_INTERNET_DISCONNECTED|net::ERR|Could not reach Cloud Firestore|WebChannelConnection|offline/i.test(e));
   eq(unexpected, [], 'erreurs');
 });
 

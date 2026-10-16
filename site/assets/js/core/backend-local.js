@@ -80,6 +80,7 @@ export function createLocalBackend({ seasonId = '2027', profile = {} } = {}) {
       try {
         channel = new BroadcastChannel(`saison-${seasonId}`);
         channel.onmessage = (ev) => { if (ev.data?.from !== tabId) onExternalChange(); };
+        channel.unref?.();
       } catch { channel = null; }
       handlers.sync({ status: 'local' });
       handlers.settings(deepClone(data.settings));

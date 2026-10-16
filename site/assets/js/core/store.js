@@ -173,6 +173,21 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
 
   /* --------------------------------------------------------- Écritures */
 
+  /** Affiche tout de suite ses propres modifications, sans attendre l'aller-retour avec la base. */
+  function applyOptimistic(updates) {
+    const actor = me();
+    const changes = [];
+    for (const { id, patch } of updates) {
+      const c = state.contracts.get(id);
+      if (!c) continue;
+      state.contracts.set(id, { ...c, values: { ...c.values, ...deepClone(patch) }, updatedAt: Date.now(), updatedBy: actor.uid, updatedByName: actor.name });
+      changes.push({ type: 'modified', id, keys: Object.keys(patch), remote: false });
+    }
+    if (!changes.length) return;
+    recompute();
+    emit('data', { reason: 'optimistic', changes, remote: [] });
+  }
+
   function guardWrite(promise, what) {
     return Promise.resolve(promise).catch((err) => {
       console.error(err);
@@ -209,6 +224,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
       });
     });
     if (opts.undo !== false) pushUndo({ label: 'Modification', undo: () => updateFields(id, before, { undo: false, automations: false, source: 'undo' }), redo: () => updateFields(id, full, { undo: false, automations: false, source: 'undo' }) });
+    applyOptimistic([{ id, patch: full }]);
     await guardWrite(backend.updateContracts([{ id, patch: full }], history, me()), 'la modification');
     if (Object.keys(auto).length) emit('automation', { id, fields: Object.keys(auto), values: auto });
     return full;
@@ -245,6 +261,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
         redo: () => backendBulk(updates.map((u) => ({ ...u })), 'undo'),
       });
     }
+    applyOptimistic(updates);
     await guardWrite(backend.updateContracts(updates, opts.history === false ? [] : history, me()), 'la modification groupée');
     return updates.length;
   }
@@ -564,10 +581,11 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
       error(err) { emit('error', { message: errorMessage(err), err }); },
     });
     // Recalcule les alertes au changement de jour.
-    setInterval(() => {
+    const dayTimer = setInterval(() => {
       const t = todayISO();
       if (t !== state.today) { state.today = t; recompute(); emit('data', { reason: 'day' }); }
     }, 60000);
+    dayTimer.unref?.();
     return stop;
   }
 
