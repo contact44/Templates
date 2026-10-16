@@ -31,8 +31,7 @@ export function mount(el, ctx, { sub } = {}) {
   let dirty = false;
   let remoteChanged = false;
   let listKey = 'statut';
-  const renames = []; // { list, from, to }
-  const removals = []; // { list, value, replacement }
+  const removals = []; // { list, value (valeur d'origine), replacement }
   const memberRemovals = []; // { id, replacement }
 
   el.innerHTML = `<div class="page page-settings">
@@ -52,7 +51,8 @@ export function mount(el, ctx, { sub } = {}) {
   function resetDraft() {
     draft = deepClone(store.state.settings);
     dirty = false; remoteChanged = false;
-    renames.length = 0; removals.length = 0; memberRemovals.length = 0;
+    removals.length = 0; memberRemovals.length = 0;
+    tagOriginals();
     saveBar.hidden = true;
   }
 
@@ -65,8 +65,15 @@ export function mount(el, ctx, { sub } = {}) {
     const partial = {};
     for (const k of keys) partial[k] = cleanForSave(k, draft[k]);
     await store.saveSettings(partial, sec.label);
-    for (const r of renames) await store.replaceListValueInContracts(r.list, r.from, r.to);
-    for (const r of removals) if (r.replacement !== undefined) await store.replaceListValueInContracts(r.list, r.value, r.replacement);
+    // Renommages et suppressions appliqués en une seule passe par liste (une permutation A ↔ B reste correcte).
+    if (keys.includes('lists')) {
+      const maps = {};
+      for (const [k, list] of Object.entries(draft.lists)) {
+        for (const o of list) if (o._orig && o._orig !== o.value) (maps[k] = maps[k] || {})[o._orig] = o.value;
+      }
+      for (const r of removals) if (r.replacement !== undefined) (maps[r.list] = maps[r.list] || {})[r.value] = r.replacement;
+      for (const [k, map] of Object.entries(maps)) await store.remapListValues(k, map);
+    }
     for (const r of memberRemovals) await store.replaceMemberInContracts(r.id, r.replacement);
     resetDraft();
     toast('Paramètres enregistrés pour toute l’équipe.', { type: 'success' });
@@ -212,7 +219,6 @@ export function mount(el, ctx, { sub } = {}) {
     const keys = Object.keys(draft.lists);
     if (!keys.includes(listKey)) listKey = keys[0];
     const list = draft.lists[listKey];
-    list.forEach((o) => { if (o._orig === undefined) o._orig = o.value; });
     const isStatus = listKey === 'statut';
     const dateCols = draft.columns.filter((c) => c.type === 'date');
     bodyEl.innerHTML = `${head('Listes de valeurs', 'Valeurs proposées dans les listes déroulantes. Renommer une valeur met à jour tous les contrats concernés à l’enregistrement.')}
@@ -226,9 +232,9 @@ export function mount(el, ctx, { sub } = {}) {
             <button class="swatch-btn" data-color="${i}" style="--c:${esc(o.color)}" aria-label="Couleur"></button>
             <input class="input" data-opt="value" value="${esc(o.value)}" aria-label="Valeur">
             ${isStatus ? `<select class="input" data-opt="stage" aria-label="Étape">${STAGES.map((st) => `<option value="${st.id}" ${o.stage === st.id ? 'selected' : ''}>${esc(st.label)}</option>`).join('')}</select>
-              <input class="input input-xs" type="number" min="0" max="100" data-opt="progress" value="${o.progress ?? ''}" placeholder="—" aria-label="Avancement en %">
+              <input class="input input-xs" type="number" min="0" max="100" data-opt="progress" value="${esc(o.progress ?? '')}" placeholder="—" aria-label="Avancement en %">
               <select class="input" data-opt="dateField" aria-label="Date automatique"><option value="">—</option>${dateCols.map((c) => `<option value="${esc(c.key)}" ${o.dateField === c.key ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select>` : ''}
-            <span class="muted small">${store.countListValueUsage(listKey, o._orig || o.value)} contrat(s)</span>
+            <span class="muted small">${o._orig ? store.countListValueUsage(listKey, o._orig) : 0} contrat(s)</span>
             <button class="icon-btn" data-del-opt="${i}" aria-label="Supprimer la valeur" data-tip="Supprimer">${icon('trash')}</button>
           </div>`).join('')}
         </div>
@@ -242,14 +248,7 @@ export function mount(el, ctx, { sub } = {}) {
       markDirty();
     }));
     bodyEl.querySelectorAll('[data-opt="value"]').forEach((inp) => inp.addEventListener('change', () => {
-      const o = draft.lists[listKey][Number(inp.closest('[data-i]').dataset.i)];
-      const v = inp.value.trim();
-      o.value = v;
-      if (o._orig && o._orig !== v) {
-        const ex = renames.find((r) => r.list === listKey && r.to === o._orig);
-        if (ex) ex.to = v; else renames.push({ list: listKey, from: o._orig, to: v });
-        o._orig = v;
-      }
+      draft.lists[listKey][Number(inp.closest('[data-i]').dataset.i)].value = inp.value.trim();
     }));
     bodyEl.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => colorPicker(b, (c) => { draft.lists[listKey][Number(b.dataset.color)].color = c; markDirty(); renderLists(); })));
     bodyEl.querySelectorAll('[data-up],[data-down]').forEach((b) => b.addEventListener('click', () => {
@@ -262,13 +261,13 @@ export function mount(el, ctx, { sub } = {}) {
     bodyEl.querySelectorAll('[data-del-opt]').forEach((b) => b.addEventListener('click', async () => {
       const i = Number(b.dataset.delOpt);
       const o = draft.lists[listKey][i];
-      const used = store.countListValueUsage(listKey, o._orig || o.value);
+      const used = o._orig ? store.countListValueUsage(listKey, o._orig) : 0;
       let replacement;
       if (used) {
         replacement = await chooseReplacement(`Supprimer « ${o.value} »`, `${used} contrat(s) utilisent cette valeur. Par quoi la remplacer ?`, draft.lists[listKey].filter((x) => x !== o).map((x) => ({ value: x.value, label: x.value })), 'Laisser vide');
         if (replacement === undefined) return;
       }
-      removals.push({ list: listKey, value: o._orig || o.value, replacement: used ? replacement : undefined });
+      if (o._orig) removals.push({ list: listKey, value: o._orig, replacement: used ? replacement : undefined });
       draft.lists[listKey].splice(i, 1); markDirty(); renderLists();
     }));
     bodyEl.querySelector('[data-act="add-opt"]').addEventListener('click', () => {
@@ -503,6 +502,11 @@ export function mount(el, ctx, { sub } = {}) {
     });
   }
 
+  /** Mémorise la valeur d'origine de chaque option de liste (renommages calculés à l'enregistrement). */
+  function tagOriginals() {
+    for (const list of Object.values(draft.lists || {})) for (const o of list) o._orig = o.value;
+  }
+
   function setPath(obj, path, value) {
     const parts = path.split('.');
     let o = obj;
@@ -525,6 +529,7 @@ export function mount(el, ctx, { sub } = {}) {
   });
 
   bodyEl.addEventListener('click', onDataClick);
+  tagOriginals();
   render();
   return {
     route({ sub: next }) {
@@ -532,7 +537,7 @@ export function mount(el, ctx, { sub } = {}) {
     },
     update(evt) {
       if (evt === 'settings') {
-        if (dirty) { remoteChanged = true; markDirty(); } else { draft = deepClone(store.state.settings); render(); }
+        if (dirty) { remoteChanged = true; markDirty(); } else { draft = deepClone(store.state.settings); tagOriginals(); render(); }
       }
       if (evt === 'data' && !dirty && (section === 'listes' || section === 'donnees')) render();
     },

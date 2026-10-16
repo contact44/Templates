@@ -219,11 +219,23 @@ export function mount(el, ctx) {
     const editingState = editing;
     let editorNode = null;
     if (editingState) { rerendering = true; editorNode = editingState.el; editorNode.remove(); }
+    // La sélection suit le contrat et la colonne, pas la position : un tri, un filtre ou l'ajout d'une ligne
+    // par un collègue ne la déplace jamais sur un autre contrat.
+    const refOf = (p) => (p && rows[p.r] && cols[p.c] ? { id: rows[p.r].id, key: cols[p.c].key } : null);
+    const activeRef = refOf(active);
+    const anchorRef = refOf(anchor);
     computeColumns();
     renderBody();
     renderHead();
     ctx.navIds = rows.map((c) => c.id);
-    if (active && (active.r >= rows.length || active.c >= cols.length)) active = rows.length ? { r: Math.min(active.r, rows.length - 1), c: Math.min(active.c, cols.length - 1) } : null;
+    const resolve = (ref) => {
+      if (!ref) return null;
+      const r = rows.findIndex((c) => c.id === ref.id);
+      const c = cols.findIndex((x) => x.key === ref.key);
+      return r >= 0 && c >= 0 ? { r, c } : null;
+    };
+    active = resolve(activeRef);
+    anchor = active ? resolve(anchorRef) : null;
     paintSelection();
     paintPresence();
     paintFlashes();
@@ -238,7 +250,13 @@ export function mount(el, ctx) {
         td.appendChild(editorNode);
         editingState.input?.focus({ preventScroll: true });
         active = { r, c: ci };
-      } else editing = null;
+      } else {
+        // La ligne a quitté la vue (filtre, modification d'un collègue) : la saisie est enregistrée, pas perdue.
+        editing = null;
+        rerendering = false;
+        editingState.commit();
+        scroller.focus({ preventScroll: true });
+      }
       rerendering = false;
     }
   }
@@ -249,7 +267,7 @@ export function mount(el, ctx) {
 
   function rangeBounds() {
     if (!active) return null;
-    const a = anchor || active;
+    const a = anchor && rows[anchor.r] && cols[anchor.c] ? anchor : active;
     return { r0: Math.min(a.r, active.r), r1: Math.max(a.r, active.r), c0: Math.min(a.c, active.c), c1: Math.max(a.c, active.c) };
   }
 
@@ -350,7 +368,8 @@ export function mount(el, ctx) {
         for (let c = b.c0; c <= b.c1; c++) {
           count++;
           const col = cols[c];
-          const v = rows[r]?.values[col.key];
+          if (!col || !rows[r]) continue;
+          const v = rows[r].values[col.key];
           if (col.type === 'number' && !isEmpty(v)) { n++; sum += Number(v) || 0; }
         }
       }
@@ -432,9 +451,13 @@ export function mount(el, ctx) {
     if (col.type === 'select' || col.type === 'person' || col.type === 'multiselect') {
       optionPicker(td, {
         options: optionsForColumn(s, col), value, multi: col.type === 'multiselect', title: col.label,
-        onChange: (v) => store.updateField(contract.id, col.key, v),
+        onChange: async (v, o) => {
+          if (o?.create && col.list) await store.addListValue(col.list, o.value);
+          store.updateField(contract.id, col.key, v);
+        },
         onClose: () => scroller.focus({ preventScroll: true }),
-        allowCreate: col.type !== 'person',
+        // Les statuts se créent dans les paramètres (ils pilotent les calculs).
+        allowCreate: col.type !== 'person' && col.list !== 'statut',
       });
       return;
     }
@@ -455,11 +478,10 @@ export function mount(el, ctx) {
       ta.value = initial !== null ? initial : value || '';
       let saved = false;
       const save = () => { if (saved) return; saved = true; store.updateField(contract.id, col.key, ta.value.trim() || null); };
-      const p = popover(td, wrap, { width: 420, onClose: () => { save(); scroller.focus({ preventScroll: true }); } });
+      const p = popover(td, wrap, { width: 420, onEscape: () => { saved = true; }, onClose: () => { save(); scroller.focus({ preventScroll: true }); } });
       wrap.querySelector('button').onclick = () => p.close();
       ta.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); p.close(); }
-        if (e.key === 'Escape') { saved = true; }
       });
       setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
       return;
@@ -528,6 +550,7 @@ export function mount(el, ctx) {
       for (let c = b.c0; c <= b.c1; c++) {
         const col = cols[c];
         const contract = rows[r];
+        if (!col || !contract) continue;
         line.push(col.type === 'computed' ? displayValue(store.state.settings, contract, col, store.state.derived.get(contract.id)) : copyValue(col, contract.values[col.key]));
       }
       out.push(line);
@@ -542,6 +565,7 @@ export function mount(el, ctx) {
     for (let r = b.r0; r <= b.r1; r++) {
       for (let c = b.c0; c <= b.c1; c++) {
         const col = cols[c];
+        if (!col || !rows[r]) continue;
         if (col.readonly || col.type === 'computed' || col.required) continue;
         const id = rows[r].id;
         if (!patches.has(id)) patches.set(id, {});
@@ -604,7 +628,7 @@ export function mount(el, ctx) {
     if (creations.length) {
       const named = creations.filter((v) => !isEmpty(v.client));
       if (named.length && await confirmDialog({ title: `Créer ${named.length} nouveau(x) contrat(s) ?`, message: 'Les lignes collées dépassent la fin du tableau. Voulez-vous les ajouter comme nouveaux contrats ?', confirmLabel: 'Créer' })) {
-        const res = await store.importContracts(named, { mode: 'append', source: 'Collage' });
+        const res = await store.importContracts(named, { mode: 'append', source: 'Collage', undoable: true });
         toast(`${res.created} contrat(s) créé(s).`, { type: 'success' });
       } else if (!named.length) toast('Les lignes collées sous le tableau doivent contenir le nom du client pour être créées.', { type: 'warning' });
     }

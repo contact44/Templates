@@ -345,7 +345,7 @@ export function toCSV(rows) {
   const body = rows.map((r) => r.map((c) => {
     let s = String(c ?? '');
     // Neutralise les formules (=, +, @) pour qu'Excel ne les exécute pas à l'ouverture.
-    if (typeof c === 'string' && /^[=+@\t\r]/.test(s)) s = `'${s}`;
+    if (typeof c === 'string' && (/^[=+@\t\r]/.test(s) || /^-(?![\d\s,.\u00a0\u202f]+$)/.test(s))) s = `'${s}`;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(';')).join('\r\n');
   return `﻿${body}`;

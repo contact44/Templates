@@ -67,6 +67,8 @@ export function startApp(root, store, { config }) {
 
   const $ = (sel) => root.querySelector(sel);
   const mainEl = $('#main');
+  // Faux si l'interface a été remplacée (ex. écran « accès non autorisé ») : plus aucun rendu.
+  const alive = () => mainEl.isConnected;
 
   const ctx = {
     store,
@@ -131,6 +133,7 @@ export function startApp(root, store, { config }) {
   /* -------------------------------------------------------- Habillage */
 
   function renderChrome() {
+    if (!alive()) return;
     const s = store.state.settings;
     $('#brand-season').textContent = s.season.name;
     $('#print-meta').textContent = `${s.season.name}${s.season.entity ? ` · ${s.season.entity}` : ''} · imprimé le ${fmtDate(store.state.today, 'long')}`;
@@ -157,12 +160,14 @@ export function startApp(root, store, { config }) {
   }
 
   function renderUser() {
+    if (!alive()) return;
     const me = store.me();
     $('#user-btn').innerHTML = avatar({ name: me.name, color: me.color, initials: me.initials }, { size: 'md', title: false });
     $('#user-btn').setAttribute('data-tip', me.name);
   }
 
   function renderUndo() {
+    if (!alive()) return;
     $('#undo-btn').disabled = !store.canUndo();
     $('#redo-btn').disabled = !store.canRedo();
   }
@@ -177,6 +182,7 @@ export function startApp(root, store, { config }) {
   };
 
   function renderSync() {
+    if (!alive()) return;
     const [ic, label, cls] = SYNC[store.state.sync.status] || SYNC.connecting;
     const el = $('#sync');
     el.className = `sync sync-${cls}`;
@@ -185,6 +191,7 @@ export function startApp(root, store, { config }) {
   }
 
   function renderPresence() {
+    if (!alive()) return;
     const peers = store.peers();
     const me = store.me();
     const el = $('#presence');
@@ -197,6 +204,7 @@ export function startApp(root, store, { config }) {
   }
 
   function renderBanner() {
+    if (!alive()) return;
     const el = $('#banner');
     if (config.preview) {
       el.innerHTML = `<div class="banner banner-info">${icon('info')}<span class="long"><strong>Aperçu</strong> avec des données fictives : vos modifications restent dans ce navigateur. En ligne, avec Firebase configuré, les contract managers modifient les mêmes données en temps réel.</span><span class="short"><strong>Aperçu</strong> · données fictives</span></div>`;
@@ -307,6 +315,7 @@ export function startApp(root, store, { config }) {
 
   const throttledChrome = throttle(renderChrome, 400);
   store.on('data', (payload) => {
+    if (!alive()) return;
     current?.update?.('data', payload);
     updateDrawer(ctx, 'data', payload);
     throttledChrome();

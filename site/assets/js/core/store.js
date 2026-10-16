@@ -173,6 +173,18 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
 
   /* --------------------------------------------------------- Écritures */
 
+  /** Ajoute tout de suite les contrats créés (la fiche peut s'ouvrir avant la réponse de la base). */
+  function applyOptimisticCreate(contracts) {
+    const actor = me();
+    const now = Date.now();
+    for (const c of contracts) {
+      if (state.contracts.has(c.id)) continue;
+      state.contracts.set(c.id, { id: c.id, values: deepClone(c.values), createdAt: now, createdBy: actor.uid, createdByName: actor.name, updatedAt: now, updatedBy: actor.uid, updatedByName: actor.name });
+    }
+    recompute();
+    emit('data', { reason: 'optimistic', changes: contracts.map((c) => ({ type: 'added', id: c.id, remote: false })), remote: [] });
+  }
+
   /** Affiche tout de suite ses propres modifications, sans attendre l'aller-retour avec la base. */
   function applyOptimistic(updates) {
     const actor = me();
@@ -288,16 +300,48 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     return max;
   }
 
+  const isOffline = () => state.sync.status === 'offline' || (typeof navigator !== 'undefined' && navigator.onLine === false);
+
   async function reserveRefs(count) {
-    let start;
-    try { start = await backend.reserveRefs(count); } catch { start = null; }
+    let start = null;
+    // Hors ligne, le compteur partagé est inaccessible : numérotation locale, doublons corrigés au retour du réseau.
+    if (!isOffline()) { try { start = await backend.reserveRefs(count); } catch { start = null; } }
     const floor = maxRefNumber() + 1;
     if (!start || start < floor) {
       start = floor;
-      try { await backend.setCounterAtLeast(start + count - 1); } catch { /* compteur indisponible hors ligne */ }
+      if (!isOffline()) { try { await backend.setCounterAtLeast(start + count - 1); } catch { /* compteur indisponible */ } }
     }
     return start;
   }
+
+  /** Renumérote ses propres contrats dont la référence fait doublon avec un contrat créé avant. */
+  let fixingRefs = false;
+  async function fixDuplicateRefs() {
+    if (fixingRefs || isOffline() || !state.user) return;
+    const byRef = new Map();
+    for (const c of state.list) {
+      const r = norm(c.values.ref);
+      if (!r) continue;
+      if (!byRef.has(r)) byRef.set(r, []);
+      byRef.get(r).push(c);
+    }
+    const mine = [];
+    for (const group of byRef.values()) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
+      for (const c of group.slice(1)) if (c.createdBy === state.user.uid) mine.push(c);
+    }
+    if (!mine.length) return;
+    fixingRefs = true;
+    try {
+      let next = await reserveRefs(mine.length);
+      const updates = mine.map((c) => ({ id: c.id, patch: { ref: formatRef(next++) } }));
+      const history = updates.map((u) => historyEntry(getContract(u.id), { action: 'update', field: 'ref', fieldLabel: 'Réf.', from: getContract(u.id).values.ref, to: u.patch.ref, auto: true }));
+      await backend.updateContracts(updates, history, me());
+    } catch { /* nouvel essai au prochain changement */ } finally { fixingRefs = false; }
+  }
+  let refTimer = null;
+  const scheduleRefCheck = () => { clearTimeout(refTimer); refTimer = setTimeout(fixDuplicateRefs, 2500); refTimer.unref?.(); };
 
   function formatRef(n) {
     return `${state.settings.season.refPrefix || 'C'}-${String(n).padStart(3, '0')}`;
@@ -314,12 +358,14 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     const contract = { id, values: v };
     const history = [historyEntry(contract, { action: 'create' })];
     if (opts.undo !== false) pushUndo({ label: 'Création', undo: () => deleteContracts([id], { undo: false }), redo: () => restoreContracts([deepClone(contract)]) });
+    applyOptimisticCreate([contract]);
     await guardWrite(backend.createContracts([contract], history, me()), 'la création');
     return id;
   }
 
   async function restoreContracts(contracts) {
     const history = contracts.map((c) => historyEntry(c, { action: 'restore' }));
+    applyOptimisticCreate(contracts);
     await guardWrite(backend.createContracts(contracts.map((c) => ({ id: c.id, values: c.values })), history, me()), 'la restauration');
   }
 
@@ -345,7 +391,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
    * mode « append » : ajoute ; « update » : met à jour les contrats reconnus (réf. ou client) et ajoute les autres ;
    * « replace » : supprime les contrats existants puis importe.
    */
-  async function importContracts(rows, { mode = 'append', source = 'Excel' } = {}) {
+  async function importContracts(rows, { mode = 'append', source = 'Excel', undoable = false } = {}) {
     let toCreate = []; const updates = [];
     const actor = me();
     if (mode === 'update') {
@@ -388,7 +434,12 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     for (let i = 0; i < updates.length; i += 400) {
       await guardWrite(backend.updateContracts(updates.slice(i, i + 400), [], actor), 'l’import');
     }
-    undoStack.length = 0; redoStack.length = 0; emit('undo');
+    if (undoable && mode === 'append' && !updates.length) {
+      const ids = created.map((c) => c.id);
+      pushUndo({ label: 'Création par collage', undo: () => deleteContracts(ids, { undo: false }), redo: () => restoreContracts(created.map(deepClone)) });
+    } else {
+      undoStack.length = 0; redoStack.length = 0; emit('undo');
+    }
     return { created: created.length, updated: updates.length };
   }
 
@@ -439,19 +490,38 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   }
 
   async function replaceListValueInContracts(listKey, oldValue, newValue) {
+    return remapListValues(listKey, { [oldValue]: newValue ?? null });
+  }
+
+  /**
+   * Applique en une seule passe un ensemble de renommages / remplacements { ancienne: nouvelle|null }
+   * (une permutation A↔B est donc correcte).
+   */
+  async function remapListValues(listKey, map) {
+    const has = (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(map, v);
+    if (!Object.keys(map).length) return 0;
     const cols = state.settings.columns.filter((c) => (c.type === 'select' || c.type === 'multiselect') && c.list === listKey);
     if (!cols.length) return 0;
     return bulkUpdate(state.list.map((c) => c.id), (c) => {
       const patch = {};
       for (const col of cols) {
         const v = c.values[col.key];
-        if (col.type === 'select' && v === oldValue) patch[col.key] = newValue ?? null;
-        if (col.type === 'multiselect' && Array.isArray(v) && v.includes(oldValue)) {
-          patch[col.key] = [...new Set(v.map((x) => (x === oldValue ? newValue : x)).filter(Boolean))];
+        if (col.type === 'select' && has(v)) patch[col.key] = map[v] ?? null;
+        if (col.type === 'multiselect' && Array.isArray(v) && v.some(has)) {
+          patch[col.key] = [...new Set(v.map((x) => (has(x) ? map[x] : x)).filter(Boolean))];
         }
       }
       return patch;
     }, { automations: false, undo: false, label: 'Mise à jour de liste' });
+  }
+
+  /** Ajoute une valeur à une liste (choix « Ajouter… » d'un sélecteur). */
+  async function addListValue(listKey, value) {
+    const lists = deepClone(state.settings.lists);
+    const list = lists[listKey] || (lists[listKey] = []);
+    if (list.some((o) => norm(o.value) === norm(value))) return;
+    list.push({ value: String(value).trim(), color: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'][list.length % 8] });
+    await saveSettings({ lists }, `Valeur « ${value} » ajoutée`);
   }
 
   function countListValueUsage(listKey, value) {
@@ -496,7 +566,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   const dedupe = (lists) => {
     const seen = new Map();
     for (const l of lists) for (const h of l || []) if (h && !seen.has(h.id)) seen.set(h.id, h);
-    return [...seen.values()].sort((a, b) => b.ts - a.ts);
+    return [...seen.values()].sort((a, b) => b.ts - a.ts || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   };
 
   /** Historique complet d'un contrat (entrées récentes + anciennes). */
@@ -506,8 +576,10 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   }
 
   /** Page d'entrées plus anciennes que la plus ancienne connue. */
-  async function olderHistory(beforeTs, max = 500) {
-    try { return await backend.loadHistory({ beforeTs, max }); } catch (err) { emit('error', { message: errorMessage(err, 'le chargement du journal'), err }); return []; }
+  async function olderHistory(before, max = 500) {
+    const beforeTs = before && typeof before === 'object' ? before.ts : before;
+    const beforeId = before && typeof before === 'object' ? before.id : null;
+    try { return await backend.loadHistory({ beforeTs, beforeId, max }); } catch (err) { emit('error', { message: errorMessage(err, 'le chargement du journal'), err }); return []; }
   }
 
   /** Tout le journal (exports). */
@@ -515,7 +587,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     let all = state.history.slice();
     if (!backend.historyIsPartial) return all;
     for (let guard = 0; guard < 40; guard++) {
-      const oldest = all.length ? all[all.length - 1].ts : null;
+      const oldest = all.length ? all[all.length - 1] : null;
       const page = await olderHistory(oldest, 1000);
       all = dedupe([all, page]);
       if (page.length < 1000) break;
@@ -615,8 +687,12 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
   async function start() {
     const stop = await backend.start({
       settings(s) {
+        const first = !state.loaded.settings;
         state.loaded.settings = true;
-        if (s) state.settings = normalizeSettings(s);
+        const next = s ? normalizeSettings(s) : state.settings;
+        // Le document de saison change aussi quand le compteur de références avance : on ignore ces mises à jour.
+        if (!first && JSON.stringify(next) === JSON.stringify(state.settings)) return;
+        state.settings = next;
         recompute();
         emit('settings');
         emit('data', { reason: 'settings' });
@@ -632,6 +708,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
         recompute();
         emit('data', { reason: 'contracts', changes, remote, initial: !!meta.initial });
         if (remote.length) emit('remote', remote);
+        if (changes.some((c) => c.type === 'added')) scheduleRefCheck();
       },
       comments(list) { state.comments = list.slice().sort((a, b) => a.ts - b.ts); emit('comments'); },
       history(list) { state.history = list.slice().sort((a, b) => b.ts - a.ts); emit('history'); },
@@ -658,7 +735,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     setPrefs, setFilters, filtered, getContract, me, meMember,
     updateField, updateFields, bulkUpdate, createContract, duplicateContract, deleteContracts, importContracts,
     undo, redo, canUndo: () => undoStack.length > 0, canRedo: () => redoStack.length > 0,
-    saveSettings, renameListValue, replaceListValueInContracts, countListValueUsage, replaceMemberInContracts,
+    saveSettings, renameListValue, replaceListValueInContracts, remapListValues, addListValue, countListValueUsage, replaceMemberInContracts,
     addComment, deleteComment, logEvent, contractHistory, olderHistory, fullHistory, dedupeHistory: dedupe,
     exportBackup, restoreBackup, loadDemo, clearAll, nextSeasonBackup,
     setPresence, peers, formatRef,
@@ -669,6 +746,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
 export function errorMessage(err, what) {
   const code = err?.code || '';
   if (code.includes('permission-denied')) return 'Accès refusé : votre compte n’est pas autorisé à modifier ces données.';
+  if (code.includes('deleted-by-peer')) return err.message;
   if (code.includes('not-found')) return 'Cet élément n’existe plus (il a peut-être été supprimé par un autre utilisateur).';
   if (code.includes('unavailable')) return 'Connexion au serveur impossible. Les modifications seront envoyées dès le retour du réseau.';
   if (code.includes('resource-exhausted')) return 'Quota Firebase dépassé pour aujourd’hui.';

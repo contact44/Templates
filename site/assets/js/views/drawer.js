@@ -82,12 +82,34 @@ export function updateDrawer(ctx, evt, payload) {
       }
       refreshComputed();
     }
-    if (payload?.reason === 'settings') render();
+    if (payload?.reason === 'settings') renderPreservingFocus();
   }
   if (evt === 'comments' && state.tab === 'comments') renderTab();
   if (evt === 'comments') refreshTabs();
   if (evt === 'history' && state.tab === 'history') renderTab();
   if (evt === 'presence') renderPeers();
+}
+
+/** Re-rendu complet (paramètres modifiés) sans perdre une saisie en cours : différé jusqu'à la sortie du champ. */
+function renderPreservingFocus() {
+  if (!state) return;
+  if (state.el.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) {
+    if (state.pendingRender) return;
+    state.pendingRender = true;
+    const el = state.el;
+    const onOut = () => {
+      setTimeout(() => {
+        if (!state || state.el !== el) return;
+        if (el.contains(document.activeElement) && document.activeElement.matches('input, textarea, select')) return;
+        el.removeEventListener('focusout', onOut);
+        state.pendingRender = false;
+        render();
+      }, 0);
+    };
+    el.addEventListener('focusout', onOut);
+    return;
+  }
+  render();
 }
 
 function flashField(key, by) {

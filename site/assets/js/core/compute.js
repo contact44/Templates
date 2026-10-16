@@ -372,8 +372,8 @@ function coerceNonEmpty(settings, col, text, addMissing) {
     case 'date': return parseDateLoose(text);
     case 'checkbox': return ['oui', 'yes', 'x', 'vrai', 'true', '1', '✓', 'ok'].includes(norm(text));
     case 'select': return matchOption(settings, col.list, String(text), addMissing);
-    case 'multiselect': return String(text).split(/[,;\n/]+/).map((s) => s.trim()).filter(Boolean)
-      .map((s) => matchOption(settings, col.list, s, addMissing)).filter(Boolean);
+    case 'multiselect': return [...new Set(String(text).split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+      .map((s) => matchOption(settings, col.list, s, addMissing)).filter(Boolean))];
     case 'person': return matchMember(settings, String(text), addMissing);
     default: return String(text instanceof Date ? fmtDate(parseDateLoose(text)) : text);
   }

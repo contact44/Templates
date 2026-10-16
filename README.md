@@ -55,8 +55,10 @@ tools/                    reconstruction des dépendances embarquées
 
 ## Qualité
 
-- 23 tests unitaires (calculs d'alertes, dates, import Excel, automatisations, annulation) ;
-- 30 étapes de test dans un vrai navigateur (édition, collage Excel, filtres, fiche, pipeline, paramètres,
+- 27 tests unitaires (calculs d'alertes, dates, import Excel, automatisations, annulation, renommage de listes,
+  pagination du journal) ;
+- 33 étapes de test dans un vrai navigateur (édition, collage Excel, tri, filtres, fiche, pipeline, paramètres,
   import / export, sauvegarde, mobile) ;
-- 17 étapes de test à **deux utilisateurs simultanés** sur l'émulateur Firebase (temps réel, modifications
-  concurrentes, présence, hors ligne, suppression, refus d'accès, journal inaltérable).
+- 21 étapes de test à **deux utilisateurs simultanés** sur l'émulateur Firebase (temps réel, modifications
+  concurrentes, présence, hors ligne, suppressions concurrentes, refus d'accès, journal inaltérable) ;
+- audit d'accessibilité automatique (axe-core) sans violation WCAG A/AA, en thème clair et sombre.

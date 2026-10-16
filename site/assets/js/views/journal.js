@@ -106,7 +106,7 @@ export function mount(el, ctx) {
     if (act === 'more') { limit += 300; render(); }
     if (act === 'older') {
       const all = allEntries();
-      const page = await store.olderHistory(all.length ? all[all.length - 1].ts : null, 500);
+      const page = await store.olderHistory(all.length ? all[all.length - 1] : null, 500);
       older = store.dedupeHistory([older, page]);
       if (page.length < 500) exhausted = true;
       limit += 500;

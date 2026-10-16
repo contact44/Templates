@@ -203,6 +203,37 @@ await step('Sélection multiple et modification groupée', async () => {
   await page.click('.bulkbar [data-act="bulk-clear"]');
 });
 
+await step('La sélection suit le contrat après un tri (aucune saisie sur la mauvaise ligne)', async () => {
+  const idx = await page.$eval('th[data-key="kam"]', (e) => e.dataset.c);
+  await page.click(`tbody tr[data-id]:nth-child(2) td[data-c="${idx}"]`);
+  const id = await page.$eval('tbody tr[data-id]:nth-child(2)', (e) => e.dataset.id);
+  await page.click('th[data-key="client"] .th-label');
+  await page.click('th[data-key="client"] .th-label');
+  await settle();
+  const activeId = await page.$eval('td.active', (td) => td.closest('tr').dataset.id);
+  eq(activeId, id, 'cellule active sur le même contrat');
+  await page.focus('.grid-scroll');
+  await page.keyboard.type('KAM suivi');
+  await page.keyboard.press('Enter');
+  await settle();
+  eq(await store((s, i) => s.getContract(i).values.kam, id), 'KAM suivi', 'saisie sur le bon contrat');
+  await store((s) => s.setPrefs({ sort: [{ key: 'ref', dir: 1 }] }));
+  await settle();
+});
+
+await step('Échap annule la saisie d’un texte long', async () => {
+  const idx = await page.$eval('th[data-key="commentaires"]', (e) => e.dataset.c);
+  const id = await page.$eval('tbody tr[data-id]:nth-child(3)', (e) => e.dataset.id);
+  const before = await store((s, i) => s.getContract(i).values.commentaires ?? null, id);
+  await page.click(`tbody tr[data-id]:nth-child(3) td[data-c="${idx}"]`);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.pop-text textarea');
+  await page.fill('.pop-text textarea', 'Texte à abandonner');
+  await page.keyboard.press('Escape');
+  await settle();
+  eq(await store((s, i) => s.getContract(i).values.commentaires ?? null, id), before, 'valeur inchangée');
+});
+
 await step('Fiche contrat : champs, commentaire, historique', async () => {
   await page.hover('tbody tr[data-id]:nth-child(1)');
   await page.click('tbody tr[data-id]:nth-child(1) .open-btn');
@@ -286,6 +317,21 @@ await step('Paramètres : renommer une valeur met à jour les contrats', async (
   eq(after, before, 'contrats mis à jour');
   const old = await store((s) => s.state.list.filter((c) => (c.values.division || []).includes('Mobile (MX)')).length);
   eq(old, 0, 'ancienne valeur disparue');
+});
+
+await step('Paramètres : permuter deux valeurs (P1 ↔ P2) ne mélange pas les contrats', async () => {
+  await page.click('[data-sec="listes"]');
+  await page.click('[data-list="priorite"]');
+  const before = await store((s) => ({ p1: s.state.list.filter((c) => c.values.priorite === 'P1 – Critique').map((c) => c.id).sort(), p2: s.state.list.filter((c) => c.values.priorite === 'P2 – Haute').map((c) => c.id).sort() }));
+  const inputs = page.locator('.et-row input[data-opt="value"]');
+  await inputs.nth(0).fill('tmp'); await inputs.nth(0).press('Tab');
+  await inputs.nth(1).fill('P1 – Critique'); await inputs.nth(1).press('Tab');
+  await inputs.nth(0).fill('P2 – Haute'); await inputs.nth(0).press('Tab');
+  await page.click('.savebar [data-act="save"]');
+  await page.waitForTimeout(600);
+  const after = await store((s) => ({ p1: s.state.list.filter((c) => c.values.priorite === 'P1 – Critique').map((c) => c.id).sort(), p2: s.state.list.filter((c) => c.values.priorite === 'P2 – Haute').map((c) => c.id).sort() }));
+  eq(after.p2, before.p1, 'anciens P1 devenus P2');
+  eq(after.p1, before.p2, 'anciens P2 devenus P1');
 });
 
 await step('Paramètres : ajout d’une colonne personnalisée', async () => {

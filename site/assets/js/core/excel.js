@@ -145,9 +145,13 @@ const SYNONYMS = {
 /** Propose une colonne cible pour chaque en-tête : clé existante, '__new__' ou ''. */
 export function autoMap(headers, settings) {
   const candidates = [];
+  // Colonnes calculées par l'application (avancement, alertes…) : ignorées si on réimporte un export.
+  const computed = new Set(settings.columns.filter((c) => c.type === 'computed').map((c) => norm(c.label)));
+  const skip = new Set();
   headers.forEach((h, i) => {
     const nh = norm(h).replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!nh) return;
+    if (computed.has(norm(h))) { skip.add(i); return; }
     for (const col of settings.columns) {
       if (col.type === 'computed') continue;
       const names = [norm(col.label), norm(col.key), ...(SYNONYMS[col.key] || []).map(norm)];
@@ -162,7 +166,7 @@ export function autoMap(headers, settings) {
     }
   });
   candidates.sort((a, b) => b.score - a.score);
-  const mapping = headers.map((h) => (norm(h) ? '__new__' : ''));
+  const mapping = headers.map((h, i) => (norm(h) && !skip.has(i) ? '__new__' : ''));
   const used = new Set(); const done = new Set();
   for (const c of candidates) {
     if (used.has(c.key) || done.has(c.i)) continue;

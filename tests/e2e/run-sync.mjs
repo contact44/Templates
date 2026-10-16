@@ -188,6 +188,63 @@ await step('Création simultanée : références distinctes', async () => {
   assert(refs.value[0] !== refs.value[1], `références différentes (${refs.value.join(' / ')})`);
 });
 
+await step('« Nouveau contrat » ouvre aussitôt sa fiche (mode partagé)', async () => {
+  await A.page.click('#new-btn');
+  await A.page.fill('.modal input', 'Client créé en ligne');
+  await A.page.click('#prompt-ok');
+  await A.page.waitForSelector('#drawer-root.open .drawer-title', { timeout: 5000 });
+  eq(await A.page.inputValue('.drawer-title'), 'Client créé en ligne', 'fiche ouverte');
+  assert(!(await A.page.$('.toast:has-text("n’existe plus")')), 'pas de faux message');
+  await A.page.keyboard.press('Escape');
+});
+
+await step('Saisie dans la fiche non interrompue par la création d’un contrat par un collègue', async () => {
+  const id = await get(A.page, (s) => s.state.list.find((c) => c.values.client === 'Créé par A').id);
+  await A.page.evaluate((i) => window.__app.openContract(i), id);
+  await A.page.waitForSelector('.drawer .field-row[data-key="kam"] input');
+  await A.page.click('.drawer .field-row[data-key="kam"] input');
+  await A.page.keyboard.type('Saisie en ');
+  await get(B.page, (s) => s.createContract({ client: 'Créé pendant la saisie' }));
+  await until(A.page, (s) => s.state.list.some((c) => c.values.client === 'Créé pendant la saisie'), null, 'création reçue');
+  await A.page.waitForTimeout(500);
+  await A.page.keyboard.type('cours');
+  const focused = await A.page.evaluate(() => document.activeElement?.closest('.field-row')?.dataset.key);
+  eq(focused, 'kam', 'le champ garde le focus');
+  eq(await A.page.inputValue('.drawer .field-row[data-key="kam"] input'), 'Saisie en cours', 'texte complet');
+  await A.page.keyboard.press('Enter');
+  await A.page.keyboard.press('Escape');
+});
+
+await step('Modification groupée hors ligne malgré un contrat supprimé entre-temps par un collègue', async () => {
+  const ids = await get(A.page, (s) => s.state.list.filter((c) => /Opale|Prisme|Quartz/.test(c.values.client)).map((c) => c.id));
+  eq(ids.length, 3, 'trois contrats');
+  await A.context.setOffline(true);
+  await A.page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  try {
+    await get(B.page, (s, i) => s.deleteContracts([i]), ids[0]);
+    await until(B.page, (s, i) => !s.getContract(i), ids[0], 'suppression chez B');
+    // A ne voit pas encore la suppression et modifie les trois contrats.
+    await get(A.page, async (s, list) => { await s.bulkUpdate(list, { kam: 'Mise à jour groupée' }); }, ids);
+  } finally {
+    await A.context.setOffline(false);
+    await A.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  }
+  await until(B.page, (s, list) => list.slice(1).every((i) => s.getContract(i)?.values.kam === 'Mise à jour groupée'), ids, 'les deux autres contrats sont à jour', 45000);
+  assert(await get(B.page, (s, i) => !s.getContract(i), ids[0]), 'le contrat supprimé n’est pas recréé');
+  await A.page.waitForSelector('.toast:has-text("supprimé par un collègue")', { timeout: 10000 });
+  assert(!(await A.page.$('.denied')), 'pas d’écran « accès non autorisé »');
+});
+
+await step('Journal complet : pagination sans perte (entrées simultanées)', async () => {
+  const all = await get(A.page, async (s) => (await s.fullHistory()).length);
+  const direct = await A.page.evaluate(async () => {
+    const fb = await import('/vendor/firebase.js');
+    const snap = await fb.getDocs(fb.collection(fb.getFirestore(), 'seasons', '2027', 'history'));
+    return snap.size;
+  });
+  eq(all, direct, 'toutes les entrées du journal');
+});
+
 await step('Compte non autorisé : accès refusé, aucune donnée lue', async () => {
   const C = await openAs('intrus@test.local');
   await C.page.waitForSelector('.denied', { timeout: 15000 });
@@ -213,7 +270,7 @@ await step('Déconnexion', async () => {
 });
 
 await step('Aucune erreur inattendue dans la console', async () => {
-  const unexpected = errors.filter((e) => !/Failed to load resource: the server responded with a status of 40[03]|permission-denied|Missing or insufficient permissions|ERR_INTERNET_DISCONNECTED|net::ERR|Could not reach Cloud Firestore|WebChannelConnection|offline/i.test(e));
+  const unexpected = errors.filter((e) => !/NOT_FOUND: no entity to update|evaluation error|Failed to load resource: the server responded with a status of 40[03]|permission-denied|Missing or insufficient permissions|ERR_INTERNET_DISCONNECTED|net::ERR|Could not reach Cloud Firestore|WebChannelConnection|offline/i.test(e));
   eq(unexpected, [], 'erreurs');
 });
 

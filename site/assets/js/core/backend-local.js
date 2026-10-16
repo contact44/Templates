@@ -167,9 +167,11 @@ export function createLocalBackend({ seasonId = '2027', profile = {} } = {}) {
       persist(); emitHistory();
     },
 
-    async loadHistory({ beforeTs = null, contractId = null, max = 500 } = {}) {
+    async loadHistory({ beforeTs = null, beforeId = null, contractId = null, max = 500 } = {}) {
       if (contractId) return deepClone(data.history.filter((h) => h.contractId === contractId));
-      return deepClone(data.history.filter((h) => !beforeTs || h.ts < beforeTs).slice(0, max));
+      const sorted = data.history.slice().sort((a, b) => b.ts - a.ts || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+      const after = (h) => !beforeTs || h.ts < beforeTs || (h.ts === beforeTs && beforeId && h.id < beforeId);
+      return deepClone(sorted.filter(after).slice(0, max));
     },
     historyIsPartial: false,
 

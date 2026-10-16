@@ -66,12 +66,35 @@ export async function createFirebaseBackend(config) {
   let presenceInfo = null;
   let heartbeat = null;
 
-  function report(err) {
+  const lastReported = new Map();
+  let knownContracts = new Map();
+  /** Erreur d'un abonnement (lecture) : un refus signifie que le compte n'a pas accès aux données. */
+  function reportRead(err) {
     console.error('[firebase]', err);
     if (String(err?.code || '').includes('permission-denied')) handlers?.denied?.(err);
+    notify(err);
+  }
+  /** Erreur d'écriture : un refus sur un contrat supprimé entre-temps n'est pas un refus d'accès. */
+  function report(err, meta = {}) {
+    console.error('[firebase]', err);
+    const code = String(err?.code || '');
+    if (meta.contractId && (code.includes('permission-denied') || code.includes('not-found'))) {
+      const deleted = Object.assign(new Error('Ce contrat a été supprimé par un collègue : la modification n’a pas pu être enregistrée.'), { code: 'deleted-by-peer' });
+      if (!knownContracts.has(meta.contractId)) { notify(deleted); return; }
+      fb.getDoc(fb.doc(contractsCol, meta.contractId)).then((snap) => notify(snap.exists() ? err : deleted)).catch(() => notify(err));
+      return;
+    }
+    notify(err);
+  }
+  function notify(err) {
+    // Une même erreur répétée (ex. plusieurs contrats supprimés entre-temps) n'est signalée qu'une fois.
+    const key = String(err?.code || err?.message || err);
+    const now = Date.now();
+    if (now - (lastReported.get(key) || 0) < 3000) return;
+    lastReported.set(key, now);
     handlers?.error(err);
   }
-  const fire = (p) => { Promise.resolve(p).catch(report); };
+  const fire = (p, meta) => { Promise.resolve(p).catch((err) => report(err, meta)); };
 
   function batches() {
     const list = [fb.writeBatch(db)];
@@ -82,7 +105,7 @@ export async function createFirebaseBackend(config) {
         count++;
         return list[list.length - 1];
       },
-      commit() { for (const b of list) fire(b.commit()); },
+      commit(meta) { for (const b of list) fire(b.commit(), meta); },
     };
   }
 
@@ -165,7 +188,7 @@ export async function createFirebaseBackend(config) {
 
       unsubs.push(fb.onSnapshot(seasonRef, (snap) => {
         handlers.settings(snap.exists() ? snap.data()?.settings || null : null);
-      }, report));
+      }, reportRead));
 
       let prev = new Map();
       let first = true;
@@ -190,22 +213,23 @@ export async function createFirebaseBackend(config) {
           }
         }
         prev = next;
+        knownContracts = next;
         if (first || changes.length) handlers.contracts(list, changes, { initial: first, fromCache: snap.metadata.fromCache });
         first = false;
         syncFrom(snap.metadata);
-      }, report));
+      }, reportRead));
 
       unsubs.push(fb.onSnapshot(commentsCol, (snap) => {
         const list = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
         handlers.comments(list);
-      }, report));
+      }, reportRead));
 
       unsubs.push(fb.onSnapshot(fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.limit(RECENT_HISTORY)), (snap) => {
         const list = [];
         snap.forEach((d) => { const x = d.data(); list.push({ ...x, id: d.id, serverTs: undefined }); });
         handlers.history(list);
-      }, report));
+      }, reportRead));
 
       let presenceDocs = [];
       const emitPresence = () => {
@@ -255,7 +279,7 @@ export async function createFirebaseBackend(config) {
         const cur = Number(snap.data()?.counter || 0);
         tx.set(seasonRef, { counter: cur + count }, { merge: true });
         return cur + 1;
-      }), 5000);
+      }), 4000);
     },
 
     async setCounterAtLeast(n) {
@@ -279,14 +303,25 @@ export async function createFirebaseBackend(config) {
     },
 
     async updateContracts(updates, history = [], actor) {
-      const b = batches();
+      // Un lot par contrat (avec ses entrées de journal) : si un collègue a supprimé l'un des contrats
+      // entre-temps, seule sa mise à jour échoue, les autres sont enregistrées.
+      const byContract = new Map();
+      const orphan = [];
+      for (const h of history) {
+        if (h.contractId && updates.some((u) => u.id === h.contractId)) {
+          if (!byContract.has(h.contractId)) byContract.set(h.contractId, []);
+          byContract.get(h.contractId).push(h);
+        } else orphan.push(h);
+      }
       for (const { id, patch } of updates) {
+        const b = batches();
         const fields = { updatedAt: fb.serverTimestamp(), updatedBy: actor.uid, updatedByName: actor.name };
         for (const [k, v] of Object.entries(patch)) fields[`values.${k}`] = sanitize(v);
         b.get().update(fb.doc(contractsCol, id), fields);
+        addHistoryTo(b, byContract.get(id));
+        b.commit({ contractId: id });
       }
-      addHistoryTo(b, history);
-      b.commit();
+      if (orphan.length) { const b = batches(); addHistoryTo(b, orphan); b.commit(); }
     },
 
     async deleteContracts(ids, history = []) {
@@ -310,11 +345,13 @@ export async function createFirebaseBackend(config) {
     async addHistory(entries) { const b = batches(); addHistoryTo(b, entries); b.commit(); },
 
     /** Entrées du journal : celles d'un contrat, ou une page d'entrées plus anciennes que beforeTs. */
-    async loadHistory({ beforeTs = null, contractId = null, max = 500 } = {}) {
+    async loadHistory({ beforeTs = null, beforeId = null, contractId = null, max = 500 } = {}) {
       let q;
+      // Tri par date puis identifiant : la pagination ne saute aucune entrée de même milliseconde.
+      const order = [fb.orderBy('ts', 'desc'), fb.orderBy(fb.documentId(), 'desc')];
       if (contractId) q = fb.query(historyCol, fb.where('contractId', '==', contractId));
-      else if (beforeTs) q = fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.startAfter(beforeTs), fb.limit(max));
-      else q = fb.query(historyCol, fb.orderBy('ts', 'desc'), fb.limit(max));
+      else if (beforeTs) q = fb.query(historyCol, ...order, fb.startAfter(beforeTs, beforeId || '\uf8ff'), fb.limit(max));
+      else q = fb.query(historyCol, ...order, fb.limit(max));
       const snap = await fb.getDocs(q);
       return snap.docs.map((d) => ({ ...d.data(), id: d.id, serverTs: undefined })).sort((a, b) => b.ts - a.ts);
     },

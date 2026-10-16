@@ -166,7 +166,7 @@ let currentPopover = null;
 
 export function closePopover() { currentPopover?.close(); }
 
-export function popover(anchor, content, { placement = 'bottom-start', className = '', onClose = null, width = null, focus = true } = {}) {
+export function popover(anchor, content, { placement = 'bottom-start', className = '', onClose = null, onEscape = null, width = null, focus = true } = {}) {
   closePopover();
   const host = root('popover-root');
   const el = document.createElement('div');
@@ -190,7 +190,7 @@ export function popover(anchor, content, { placement = 'bottom-start', className
   reposition();
   let closed = false;
   const onDown = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) close(); };
-  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); anchor.focus?.({ preventScroll: true }); } };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onEscape?.(); close(); anchor.focus?.({ preventScroll: true }); } };
   const onScroll = (e) => { if (!el.contains(e.target)) close(); };
   function close() {
     if (closed) return;

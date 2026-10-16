@@ -199,6 +199,11 @@ export function normalizeSettings(stored) {
   for (const col of def.columns.filter((c) => c.system || c.type === 'computed')) {
     if (!s.columns.some((c) => c.key === col.key)) s.columns.push(col);
   }
+  for (const o of s.lists.statut || []) {
+    const p = Number(o.progress);
+    o.progress = o.progress === null || o.progress === undefined || o.progress === '' || !Number.isFinite(p) ? null : Math.max(0, Math.min(100, p));
+    if (!['todo', 'active', 'blocked', 'done', 'cancelled'].includes(o.stage)) o.stage = 'active';
+  }
   for (const col of s.columns) {
     if (col.type === 'select' || col.type === 'multiselect') {
       if (!col.list) col.list = col.key;
