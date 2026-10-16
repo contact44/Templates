@@ -510,7 +510,7 @@ export function mount(el, ctx, { sub } = {}) {
       e.preventDefault();
       const ok = await confirmDialog({ title: 'Modifications non enregistrées', message: 'Enregistrer les modifications de cette section avant de changer de section ?', confirmLabel: 'Enregistrer', cancelLabel: 'Ignorer' });
       if (ok) await save(); else resetDraft();
-      location.hash = `#/parametres/${sec.dataset.sec}`;
+      ctx.navigate(`parametres/${sec.dataset.sec}`);
       return;
     }
     const act = e.target.closest('.savebar [data-act]')?.dataset.act;

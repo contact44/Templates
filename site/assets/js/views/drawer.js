@@ -6,6 +6,7 @@ import {
   alertList, avatar, fieldControl, optionChip, optionPicker, optionsForColumn, personHTML, progressHTML,
 } from '../ui/components.js';
 import { confirmDialog, menu, toast } from '../ui/overlay.js';
+import { readHash, writeHash } from '../ui/nav.js';
 import { columnByKey, FIELD_GROUPS, listOptions, milestoneByRole } from '../core/schema.js';
 import { displayValue } from '../core/compute.js';
 import {
@@ -17,10 +18,10 @@ let state = null; // { id, el, tab, controls: Map, ctx }
 export const currentContractId = () => state?.id || null;
 
 function setHashParam(id) {
-  const raw = location.hash.replace(/^#\/?/, '');
+  const raw = readHash().replace(/^#\/?/, '');
   const [path] = raw.split('?');
   const next = id ? `#/${path || 'suivi'}?c=${encodeURIComponent(id)}` : `#/${path}`;
-  if (location.hash !== next) history.pushState(null, '', next);
+  if (readHash() !== next) writeHash(next);
 }
 
 export function openContract(ctx, id, { fromRoute = false, tab = null } = {}) {

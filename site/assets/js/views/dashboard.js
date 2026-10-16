@@ -13,6 +13,8 @@ import {
 } from '../core/compute.js';
 import { columnByKey, STAGES, STAGE_ORDER_FOR_BARS } from '../core/schema.js';
 import { buildDemo } from '../core/demo.js';
+import { confirmDialog } from '../ui/overlay.js';
+import { openImportDialog } from './importer.js';
 import {
   addDays, debounce, esc, fmtCountdown, fmtDate, fmtMoneyK, fmtNumber, fmtPct, fmtRelative, pluralize,
 } from '../core/utils.js';
@@ -203,8 +205,11 @@ export function mount(el, ctx) {
     if (dim) { store.setPrefs({ dashboardDim: dim.dataset.dim }); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'new') ctx.newContract();
-    if (act === 'import') ctx.navigate('parametres/donnees');
-    if (act === 'demo') { await store.loadDemo(buildDemo); }
+    if (act === 'import') openImportDialog(ctx);
+    if (act === 'demo') {
+      if (store.state.backend.kind !== 'local' && !(await confirmDialog({ title: 'Charger des données fictives ?', message: 'Une quarantaine de contrats fictifs seront ajoutés à la base partagée, visibles par toute l’équipe. Vous pourrez les supprimer ensuite (Paramètres › Import, export et sauvegarde › Tout supprimer).', confirmLabel: 'Charger' }))) return;
+      await store.loadDemo(buildDemo);
+    }
   });
 
   const ro = new ResizeObserver(debounce(() => { lastDraw?.(); fitSegmentLabels(body); }, 120));

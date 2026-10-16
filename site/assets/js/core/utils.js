@@ -343,7 +343,9 @@ export function toTSV(rows) {
 /** CSV au format Excel français (séparateur « ; », BOM UTF-8). */
 export function toCSV(rows) {
   const body = rows.map((r) => r.map((c) => {
-    const s = String(c ?? '');
+    let s = String(c ?? '');
+    // Neutralise les formules (=, +, @) pour qu'Excel ne les exécute pas à l'ouverture.
+    if (typeof c === 'string' && /^[=+@\t\r]/.test(s)) s = `'${s}`;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(';')).join('\r\n');
   return `﻿${body}`;

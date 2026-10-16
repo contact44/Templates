@@ -25,4 +25,8 @@ window.APP_CONFIG = {
   // Identifiant de la saison : changez-le (ex. "2028") pour démarrer une nouvelle saison
   // sans effacer la précédente.
   seasonId: '2027',
+
+  // Passez à true si le réseau de l'entreprise bloque la synchronisation en temps réel
+  // (l'indicateur reste sur « Connexion… » ou « Hors ligne » alors qu'Internet fonctionne).
+  forceLongPolling: false,
 };

@@ -3,6 +3,7 @@
 
 import { icon } from './ui/icons.js';
 import { SAMSUNG_LOGO } from './ui/logo.js';
+import { readHash, writeHash } from './ui/nav.js';
 import { avatar } from './ui/components.js';
 import { closePopover, confirmDialog, menu, modal, promptDialog, toast } from './ui/overlay.js';
 import { columnByKey } from './core/schema.js';
@@ -71,15 +72,20 @@ export function startApp(root, store, { config }) {
     store,
     config,
     openContract: (id, opts) => openContract(ctx, id, opts),
-    navigate: (path) => { location.hash = `#/${path}`; },
+    navigate: (path) => go(`#/${path}`),
     newContract,
     refreshChrome: () => { renderChrome(); },
   };
 
   /* --------------------------------------------------------- Routage */
 
+  function go(hash, opts) {
+    writeHash(hash, opts);
+    route();
+  }
+
   function parseHash() {
-    const raw = location.hash.replace(/^#\/?/, '');
+    const raw = readHash().replace(/^#\/?/, '');
     const [path, query = ''] = raw.split('?');
     const [routeId, sub] = path.split('/');
     const params = new URLSearchParams(query);
@@ -113,6 +119,14 @@ export function startApp(root, store, { config }) {
   }
 
   window.addEventListener('hashchange', route);
+  window.addEventListener('popstate', route);
+  // Les liens internes passent par le routeur (fonctionne aussi dans un aperçu intégré).
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[href^="#/"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    go(a.getAttribute('href'));
+  });
 
   /* -------------------------------------------------------- Habillage */
 
@@ -343,7 +357,7 @@ export function startApp(root, store, { config }) {
   renderPresence();
   renderBanner();
   route();
-  if (!location.hash) history.replaceState(null, '', `#/${parseHash().routeId}`);
+  if (!readHash()) writeHash(`#/${parseHash().routeId}`, { replace: true });
   return ctx;
 }
 

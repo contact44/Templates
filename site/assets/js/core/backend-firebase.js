@@ -39,10 +39,12 @@ export async function createFirebaseBackend(config) {
   const app = fb.initializeApp(config.firebase);
   const auth = fb.getAuth(app);
   let db;
+  // forceLongPolling : à activer si un proxy d'entreprise bloque le flux temps réel (voir le guide).
+  const net = config.forceLongPolling ? { experimentalForceLongPolling: true } : {};
   try {
-    db = fb.initializeFirestore(app, { localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }) });
+    db = fb.initializeFirestore(app, { ...net, localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }) });
   } catch {
-    db = fb.initializeFirestore(app, { localCache: fb.memoryLocalCache() });
+    db = fb.initializeFirestore(app, { ...net, localCache: fb.memoryLocalCache() });
   }
   if (config.emulator) {
     const host = config.emulatorHost || '127.0.0.1';
