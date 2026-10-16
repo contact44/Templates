@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Suivi partagé de la saison contractuelle : CGV, conventions, échéances et signatures, en temps réel.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1428a0">
+  <title>Saison contractuelle 2027</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script>
+    // Thème appliqué avant l'affichage pour éviter un flash.
+    try {
+      var p = JSON.parse(localStorage.getItem('saison:prefs') || '{}');
+      var t = p.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = t;
+    } catch (e) { /* stockage indisponible */ }
+  </script>
+  <script src="config.js"></script>
+  <script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+  <div id="app"><div class="boot"><div class="boot-spinner" aria-label="Chargement"></div></div></div>
+  <noscript><p style="padding:2rem;font-family:sans-serif">Cette application nécessite JavaScript.</p></noscript>
+</body>
+</html>

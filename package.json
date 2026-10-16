@@ -1,0 +1,22 @@
+{
+  "name": "suivi-saison-contractuelle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suivi collaboratif de la saison contractuelle (application web statique, GitHub Pages + Firebase).",
+  "type": "module",
+  "scripts": {
+    "vendor": "node tools/build-vendor.mjs",
+    "preview": "node tools/build-preview.mjs",
+    "serve": "npx http-server site -p 8080 -c-1",
+    "test:unit": "node --test tests/unit/",
+    "test:e2e": "node tests/e2e/run-local.mjs",
+    "test:sync": "firebase emulators:exec --only auth,firestore --project demo-saison \"node tests/e2e/run-sync.mjs\""
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "esbuild": "^0.28.2",
+    "exceljs": "^4.4.0",
+    "firebase": "^13.0.0",
+    "playwright": "^1.56.1"
+  }
+}

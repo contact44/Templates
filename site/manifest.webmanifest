@@ -1,0 +1,10 @@
+{
+  "name": "Saison contractuelle 2027",
+  "short_name": "Saison 2027",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1428a0",
+  "lang": "fr",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
