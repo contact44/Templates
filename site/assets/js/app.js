@@ -48,7 +48,7 @@ export function startApp(root, store, { config }) {
       <div class="main-col">
         <header class="topbar">
           <button class="icon-btn menu-btn" id="menu-btn" aria-label="Ouvrir le menu">${icon('menu')}</button>
-          <div class="topbar-title"><h1 id="page-title"></h1><p id="page-sub"></p></div>
+          <div class="topbar-title"><h1 id="page-title"></h1><p id="page-sub"></p><p class="print-meta" id="print-meta"></p></div>
           <div class="topbar-right">
             <div class="sync" id="sync" role="status" aria-live="polite"></div>
             <div class="presence" id="presence"></div>
@@ -133,6 +133,7 @@ export function startApp(root, store, { config }) {
   function renderChrome() {
     const s = store.state.settings;
     $('#brand-season').textContent = s.season.name;
+    $('#print-meta').textContent = `${s.season.name}${s.season.entity ? ` · ${s.season.entity}` : ''} · imprimé le ${fmtDate(store.state.today, 'long')}`;
     const k = kpis(s, store.state.list, store.state.derived, store.state.today);
     const counts = { suivi: k.live, echeancier: k.overdueActions };
     for (const el of root.querySelectorAll('[data-badge]')) {

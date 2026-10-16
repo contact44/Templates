@@ -167,10 +167,13 @@ directement dans l'outil.
 
 Pour démarrer la saison 2028 sans effacer 2027 :
 
-1. Exportez la saison 2027 (sauvegarde .json et export Excel).
-2. Dans `site/config.js`, remplacez `seasonId: '2027'` par `seasonId: '2028'` et publiez.
-3. Au premier démarrage, ajustez la saison et les jalons, puis importez la liste des clients (export Excel
-   de 2027, en ne gardant que les colonnes utiles).
+1. Exportez la saison 2027 (sauvegarde .json et export Excel) pour archive.
+2. **Paramètres › Import, export et sauvegarde › Préparer la saison suivante** : téléchargez le fichier de
+   départ 2028 (mêmes clients, équipe, listes et colonnes ; jalons décalés d'un an ; statuts, dates et
+   actions remis à zéro).
+3. Dans `site/config.js`, remplacez `seasonId: '2027'` par `seasonId: '2028'` et publiez.
+4. Connectez-vous, puis **Paramètres › Import, export et sauvegarde › Restaurer…** avec le fichier de départ.
+   Vérifiez les jalons (les dates légales peuvent évoluer d'une année sur l'autre).
 
 La saison 2027 reste consultable en remettant temporairement `seasonId: '2027'`.
 

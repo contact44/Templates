@@ -19,6 +19,8 @@ import { exportMenu, openImportDialog } from './importer.js';
 
 const SEL_W = 44;
 const GROUPABLE = ['statut', 'cm', 'canal', 'division', 'priorite', 'typeContrat'];
+// Colonnes conservées à l'impression (format A4 paysage).
+const PRINT_KEYS = new Set(['ref', 'client', 'cm', 'statut', '_progress', '_alerts', 'dateCgv', 'dateSignature', 'prochaineAction', 'echeance']);
 
 export function mount(el, ctx) {
   const { store } = ctx;
@@ -152,7 +154,7 @@ export function mount(el, ctx) {
         const sdir = sIdx >= 0 ? sort[sIdx].dir : 0;
         const filtered = Array.isArray(cf[col.key]);
         const isLastFrozen = col.frozen && !cols[i + 1]?.frozen;
-        return `<th data-key="${esc(col.key)}" data-c="${i}" class="${col.frozen ? 'frozen' : ''}${isLastFrozen ? ' frozen-edge' : ''}${col.align === 'right' || col.type === 'number' ? ' right' : ''}" ${col.frozen ? `style="left:${lefts[i]}px"` : ''} aria-sort="${sdir === 1 ? 'ascending' : sdir === -1 ? 'descending' : 'none'}">
+        return `<th data-key="${esc(col.key)}" data-c="${i}" class="${col.frozen ? 'frozen' : ''}${isLastFrozen ? ' frozen-edge' : ''}${col.align === 'right' || col.type === 'number' ? ' right' : ''}${PRINT_KEYS.has(col.key) ? '' : ' noprint'}" ${col.frozen ? `style="left:${lefts[i]}px"` : ''} aria-sort="${sdir === 1 ? 'ascending' : sdir === -1 ? 'descending' : 'none'}">
           <div class="th-inner">
             <button class="th-label" data-sort="${esc(col.key)}" data-tip="Trier (Maj+clic : tri secondaire)">${col.type === 'computed' ? '' : ''}<span>${esc(col.label)}</span>${sdir ? `<span class="th-sort">${icon(sdir === 1 ? 'arrowUp' : 'arrowDown')}${sort.length > 1 ? `<sup>${sIdx + 1}</sup>` : ''}</span>` : ''}</button>
             <button class="th-filter${filtered ? ' on' : ''}" data-colfilter="${esc(col.key)}" aria-label="Filtrer la colonne ${esc(col.label)}" data-tip="Filtrer">${icon('filter')}</button>
@@ -165,7 +167,7 @@ export function mount(el, ctx) {
   }
 
   function cellClass(col) {
-    return `cell t-${col.type}${col.frozen ? ' frozen' : ''}${col.readonly || col.type === 'computed' ? ' ro' : ''}${col.align === 'right' || col.type === 'number' ? ' right' : ''}`;
+    return `cell${PRINT_KEYS.has(col.key) ? '' : ' noprint'} t-${col.type}${col.frozen ? ' frozen' : ''}${col.readonly || col.type === 'computed' ? ' ro' : ''}${col.align === 'right' || col.type === 'number' ? ' right' : ''}`;
   }
 
   function rowHTML(c, r, lefts, lastFrozen) {

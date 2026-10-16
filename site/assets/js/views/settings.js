@@ -398,6 +398,7 @@ export function mount(el, ctx, { sub } = {}) {
         <section class="card tile-card"><span class="tile-ico">${icon('upload')}</span><h3>Importer un fichier Excel</h3><p class="muted">Reprenez votre fichier de suivi (.xlsx, .xlsm, .csv) ou collez un tableau copié depuis Excel. Les colonnes sont reconnues automatiquement ; les colonnes inconnues peuvent être créées.</p><button class="btn btn-primary" data-act="import">${icon('upload')}<span>Importer</span></button></section>
         <section class="card tile-card"><span class="tile-ico">${icon('sheet')}</span><h3>Exporter vers Excel</h3><p class="muted">Classeur mis en forme : suivi avec filtres et listes déroulantes, tableau de bord, journal et listes de valeurs.</p><button class="btn btn-secondary" data-act="export" ${n ? '' : 'disabled'}>${icon('download')}<span>Exporter ${n} contrat(s)</span></button></section>
         <section class="card tile-card"><span class="tile-ico">${icon('database')}</span><h3>Sauvegarde complète</h3><p class="muted">Fichier .json contenant paramètres, contrats et commentaires. Permet de restaurer l’outil à l’identique ou de démarrer la saison suivante.</p><div class="btn-row"><button class="btn btn-secondary" data-act="backup">${icon('download')}<span>Télécharger</span></button><label class="btn btn-ghost">${icon('upload')}<span>Restaurer…</span><input type="file" accept=".json,application/json" data-act="restore" hidden></label></div></section>
+        <section class="card tile-card"><span class="tile-ico">${icon('refresh')}</span><h3>Préparer la saison suivante</h3><p class="muted">Crée le fichier de départ de la saison ${esc(String(Number(store.state.settings.season.year || 0) + 1))} : mêmes clients, équipe et réglages, jalons décalés d’un an, statuts et dates de négociation remis à zéro. À restaurer dans la nouvelle saison (voir le guide de mise en ligne).</p><button class="btn btn-secondary" data-act="next-season" ${n ? '' : 'disabled'}>${icon('download')}<span>Télécharger le fichier de départ</span></button></section>
         <section class="card tile-card"><span class="tile-ico">${icon('sparkle')}</span><h3>Données de démonstration</h3><p class="muted">Charge une quarantaine de contrats fictifs cohérents avec le calendrier de la saison, pour tester l’outil. Remplace les contrats actuels.</p><button class="btn btn-ghost" data-act="demo">${icon('sparkle')}<span>Charger la démonstration</span></button></section>
       </div>
       <section class="card form-card danger-zone">
@@ -428,6 +429,11 @@ export function mount(el, ctx, { sub } = {}) {
     if (act === 'backup') {
       const data = await store.exportBackup();
       downloadBlob(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), `Sauvegarde_${(store.state.settings.season.refPrefix || 'saison')}_${todayISO()}.json`);
+    }
+    if (act === 'next-season') {
+      const data = store.nextSeasonBackup();
+      downloadBlob(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), `Depart_saison_${data.seasonId}.json`);
+      toast(`Fichier de départ de la saison ${data.seasonId} téléchargé (${data.contracts.length} clients).`, { type: 'success' });
     }
     if (act === 'demo') {
       const ok = !store.state.list.length || await confirmDialog({ title: 'Charger les données de démonstration ?', message: `Les ${store.state.list.length} contrats actuels seront remplacés par des contrats fictifs, pour toute l’équipe.`, confirmLabel: 'Charger', danger: true });

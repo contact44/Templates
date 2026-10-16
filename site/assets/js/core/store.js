@@ -539,6 +539,32 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     };
   }
 
+  /**
+   * Prépare la saison suivante : mêmes clients et mêmes réglages, jalons décalés d'un an,
+   * éléments de négociation remis à zéro. Retourne un fichier de sauvegarde à restaurer
+   * dans la nouvelle saison.
+   */
+  function nextSeasonBackup() {
+    const s = deepClone(state.settings);
+    const year = Number(s.season.year || new Date().getFullYear()) + 1;
+    const shift = (iso) => (iso ? `${Number(iso.slice(0, 4)) + 1}${iso.slice(4)}` : iso);
+    s.season = { ...s.season, year, name: String(s.season.name || '').replace(/\d{4}/, String(year)) || `Saison contractuelle ${year}`, refPrefix: String(s.season.refPrefix || '').replace(/\d{2}$/, String(year).slice(2)) };
+    s.milestones = (s.milestones || []).map((m) => ({ ...m, date: shift(m.date) }));
+    const keep = new Set(['client', 'groupe', 'canal', 'division', 'typeContrat', 'cm', 'kam', 'contactClient', 'priorite', 'ca']);
+    const first = listOptions(s, 'statut')[0]?.value || '';
+    const contracts = state.list
+      .filter((c) => state.derived.get(c.id)?.stage !== 'cancelled')
+      .sort((a, b) => String(a.values.ref).localeCompare(String(b.values.ref), 'fr', { numeric: true }))
+      .map((c, i) => {
+        const values = {};
+        for (const [k, v] of Object.entries(c.values)) if (keep.has(k)) values[k] = deepClone(v);
+        values.statut = first;
+        values.ref = `${s.season.refPrefix || 'C'}-${String(i + 1).padStart(3, '0')}`;
+        return { id: uid(), values };
+      });
+    return { format: 'suivi-saison-contractuelle', version: 1, exportedAt: new Date().toISOString(), seasonId: String(year), settings: s, contracts, comments: [], history: [] };
+  }
+
   async function restoreBackup(data) {
     if (!data || data.format !== 'suivi-saison-contractuelle' || !Array.isArray(data.contracts)) {
       throw new Error('Ce fichier n’est pas une sauvegarde de l’application.');
@@ -634,7 +660,7 @@ export function createStore(backend, { seasonId = '2027' } = {}) {
     undo, redo, canUndo: () => undoStack.length > 0, canRedo: () => redoStack.length > 0,
     saveSettings, renameListValue, replaceListValueInContracts, countListValueUsage, replaceMemberInContracts,
     addComment, deleteComment, logEvent, contractHistory, olderHistory, fullHistory, dedupeHistory: dedupe,
-    exportBackup, restoreBackup, loadDemo, clearAll,
+    exportBackup, restoreBackup, loadDemo, clearAll, nextSeasonBackup,
     setPresence, peers, formatRef,
     member: (id) => memberById(state.settings, id),
   };
